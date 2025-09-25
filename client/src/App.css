@@ -1,0 +1,108 @@
+/* App.css */
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", "Roboto", sans-serif;
+  height: 100%;
+}
+
+.App {
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Fondo degradado fuerte */
+  background: linear-gradient(135deg, #6507ca, #200a3f);
+  color: #fff;
+  padding: 2rem;
+}
+
+/* Contenedor central */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+/* Titulos grandes */
+h1,
+h2 {
+  font-weight: 800;
+  margin: 0;
+}
+
+/* Botones grandes y modernos */
+button {
+  margin: 5px;
+  width: 100%;
+  padding: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Colores de botones según rol */
+.btn-broadcaster {
+  background-color: #ff416c;
+  background-image: linear-gradient(45deg, #ff416c, #ff4b2b);
+  color: #fff;
+}
+
+.btn-broadcaster:hover {
+  background-image: linear-gradient(45deg, #ff4b2b, #ff416c);
+}
+
+.btn-listener {
+  background-color: #1fa2ff;
+  background-image: linear-gradient(45deg, #1fa2ff, #12d8fa);
+  color: #fff;
+}
+
+.btn-listener:hover {
+  background-image: linear-gradient(45deg, #12d8fa, #1fa2ff);
+}
+
+/* Tarjeta para reproductor oyente */
+.audio-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 1.5rem;
+  padding: 2rem;
+  width: 100%;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+audio {
+  width: 100%;
+  border-radius: 1rem;
+  outline: none;
+}
+
+/* Responsivo */
+@media (max-width: 480px) {
+  button {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+}
