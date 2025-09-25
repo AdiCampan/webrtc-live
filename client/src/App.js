@@ -8,7 +8,7 @@ function App() {
   const [role, setRole] = useState(null);
 
   useEffect(() => {
-    // Detecta el protocolo y host actuales (para producción Render)
+    // Detecta automáticamente el protocolo y host actuales (para Render o localhost)
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const host = window.location.host;
     const signalingServer = new WebSocket(`${protocol}://${host}`);

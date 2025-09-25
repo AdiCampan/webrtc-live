@@ -18,7 +18,7 @@ function Listener({ signalingServer }) {
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
 
-          // Configurar visualización
+          // Configuración de visualización
           audioCtx = new AudioContext();
           analyser = audioCtx.createAnalyser();
           source = audioCtx.createMediaStreamSource(event.streams[0]);
@@ -41,7 +41,7 @@ function Listener({ signalingServer }) {
     };
 
     const draw = () => {
-      if (!canvasRef.current) return;
+      if (!canvasRef.current || !analyser) return;
 
       const ctx = canvasRef.current.getContext("2d");
       const width = canvasRef.current.width;
