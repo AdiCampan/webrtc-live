@@ -4,36 +4,36 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// 🔹 Definir __dirname en ES Modules
+// Definir __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// 📦 Servir React build (opcional, solo si quieres servir la app desde este server)
+// Servir React build
 const clientBuildPath = path.join(__dirname, "../client/build");
 app.use(express.static(clientBuildPath));
 
-// Para cualquier ruta no encontrada, devolver index.html de React
-app.get("*", (req, res) => {
+// Para cualquier ruta que no coincida, devolver index.html
+app.get("/*", (req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
-// 🚀 Iniciar servidor HTTP
+// Iniciar servidor HTTP
 const server = app.listen(PORT, () => {
-  console.log(`Servidor HTTP + WebSocket escuchando en puerto ${PORT}`);
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
 
-// 🎧 Iniciar WebSocket
+// WebSocket
 const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   ws.id = uuidv4();
-  console.log(`🔗 Cliente conectado: ${ws.id}`);
+  console.log(`Cliente conectado: ${ws.id}`);
 
   ws.on("message", (msg) => {
-    // retransmitir mensaje a todos los demás clientes
+    // reenviar a todos excepto quien envió
     wss.clients.forEach((client) => {
       if (client !== ws && client.readyState === ws.OPEN) {
         client.send(msg.toString());
@@ -42,7 +42,7 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    console.log(`❌ Cliente desconectado: ${ws.id}`);
+    console.log(`Cliente desconectado: ${ws.id}`);
   });
 });
 
