@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 function Listener({ signalingServer }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
   const canvasRef = useRef(null);
+  const clientIdRef = useRef(uuidv4()); // Identificador único para este listener
 
   useEffect(() => {
     let peer = null;
@@ -34,7 +36,11 @@ function Listener({ signalingServer }) {
       peer.onicecandidate = (event) => {
         if (event.candidate) {
           signalingServer.send(
-            JSON.stringify({ type: "candidate", candidate: event.candidate })
+            JSON.stringify({
+              type: "candidate",
+              candidate: event.candidate,
+              target: clientIdRef.current,
+            })
           );
         }
       };
@@ -82,7 +88,7 @@ function Listener({ signalingServer }) {
     signalingServer.onmessage = async (event) => {
       const data = JSON.parse(event.data);
 
-      if (data.type === "offer") {
+      if (data.type === "offer" && data.target === clientIdRef.current) {
         if (peerRef.current) {
           try {
             await peerRef.current.close();
@@ -94,7 +100,13 @@ function Listener({ signalingServer }) {
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        signalingServer.send(JSON.stringify({ type: "answer", answer }));
+        signalingServer.send(
+          JSON.stringify({
+            type: "answer",
+            answer,
+            clientId: clientIdRef.current,
+          })
+        );
       }
 
       if (data.type === "candidate" && peerRef.current) {
@@ -110,7 +122,9 @@ function Listener({ signalingServer }) {
 
     // Solicitar oferta al conectar
     const requestOffer = () => {
-      signalingServer.send(JSON.stringify({ type: "request-offer" }));
+      signalingServer.send(
+        JSON.stringify({ type: "request-offer", clientId: clientIdRef.current })
+      );
       console.log("Solicitando stream al intérprete...");
     };
 

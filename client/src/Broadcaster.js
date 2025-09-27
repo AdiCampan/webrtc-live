@@ -13,9 +13,10 @@ function Broadcaster({ signalingServer }) {
 
       // Alguien solicita oferta para WebRTC
       if (data.type === "request-offer") {
+        const clientId = data.clientId;
         if (!streamRef.current) return;
-        if (!peers.current[data.clientId]) {
-          await createPeer(data.clientId);
+        if (!peers.current[clientId]) {
+          await createPeer(clientId);
         }
       }
 

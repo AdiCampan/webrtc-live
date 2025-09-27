@@ -4,14 +4,14 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Definir __dirname
+// 🔹 Definir __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Servir React build
+// 📦 Servir React build
 const clientBuildPath = path.join(__dirname, "../client/build");
 app.use(express.static(clientBuildPath));
 
@@ -20,29 +20,47 @@ app.get("/*", (req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
-// Iniciar servidor HTTP
+// 🚀 Iniciar servidor HTTP
 const server = app.listen(PORT, () => {
-  console.log(`Servidor escuchando en puerto ${PORT}`);
+  console.log(`Servidor HTTP + WebSocket escuchando en puerto ${PORT}`);
 });
 
-// WebSocket
+// 🎧 Iniciar WebSocket
 const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   ws.id = uuidv4();
-  console.log(`Cliente conectado: ${ws.id}`);
+  console.log(`🔗 Cliente conectado: ${ws.id}`);
 
   ws.on("message", (msg) => {
-    // reenviar a todos excepto quien envió
-    wss.clients.forEach((client) => {
-      if (client !== ws && client.readyState === ws.OPEN) {
-        client.send(msg.toString());
+    let data;
+    try {
+      data = JSON.parse(msg.toString());
+    } catch (e) {
+      console.error("Mensaje inválido:", msg.toString());
+      return;
+    }
+
+    // Si existe un target, enviar solo a ese cliente
+    if (data.target) {
+      const targetClient = [...wss.clients].find(
+        (c) => c.id === data.target && c.readyState === ws.OPEN
+      );
+      if (targetClient) {
+        targetClient.send(JSON.stringify(data));
       }
-    });
+    } else {
+      // Si no hay target, reenviar a todos excepto el que envió
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === ws.OPEN) {
+          client.send(JSON.stringify(data));
+        }
+      });
+    }
   });
 
   ws.on("close", () => {
-    console.log(`Cliente desconectado: ${ws.id}`);
+    console.log(`❌ Cliente desconectado: ${ws.id}`);
   });
 });
 
