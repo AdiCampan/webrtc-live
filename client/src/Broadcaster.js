@@ -10,11 +10,11 @@ function Broadcaster({ signalingServer }) {
   useEffect(() => {
     const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("📩 Broadcaster recibió:", data);
+      console.log("📩 Mensaje recibido en Broadcaster:", data);
 
       if (data.type === "request-offer") {
+        console.log(`📡 Oyente ${data.clientId} pide oferta`);
         if (streamRef.current) {
-          console.log(`🎯 Creando Peer para Listener ${data.clientId}`);
           await createPeer(data.clientId);
         } else {
           console.warn(
@@ -27,10 +27,10 @@ function Broadcaster({ signalingServer }) {
         const peer = peers.current[data.clientId];
         if (peer) {
           try {
-            console.log(`✅ Recibida answer de ${data.clientId}`);
             await peer.setRemoteDescription(
               new RTCSessionDescription(data.answer)
             );
+            console.log(`✅ Answer aplicada del oyente ${data.clientId}`);
           } catch (err) {
             console.error("❌ Error al aplicar answer:", err);
           }
@@ -41,8 +41,8 @@ function Broadcaster({ signalingServer }) {
         const peer = peers.current[data.clientId];
         if (peer) {
           try {
-            console.log(`💡 Agregando ICE candidate de ${data.clientId}`);
             await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+            console.log(`➕ Candidate agregado del oyente ${data.clientId}`);
           } catch (err) {
             console.error("❌ Error agregando ICE candidate:", err);
           }
@@ -54,6 +54,7 @@ function Broadcaster({ signalingServer }) {
     return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
+  // Crear conexión WebRTC con un oyente
   const createPeer = async (clientId) => {
     if (peers.current[clientId]) {
       console.log("⚠️ Ya existe conexión con", clientId);
@@ -62,7 +63,6 @@ function Broadcaster({ signalingServer }) {
 
     const peer = new RTCPeerConnection();
     peers.current[clientId] = peer;
-    console.log("🔗 PeerConnection creado para", clientId);
 
     streamRef.current.getTracks().forEach((track) => {
       peer.addTrack(track, streamRef.current);
@@ -77,33 +77,45 @@ function Broadcaster({ signalingServer }) {
             target: clientId,
           })
         );
-        console.log(`💬 Enviando ICE candidate a ${clientId}`);
+        console.log(`📤 Enviando candidate al oyente ${clientId}`);
       }
     };
 
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
+
       signalingServer.send(
         JSON.stringify({ type: "offer", offer, target: clientId })
       );
-      console.log(`📡 Oferta enviada a ${clientId}`);
+      console.log(`📤 Oferta enviada al oyente ${clientId}`);
     } catch (err) {
       console.error("❌ Error creando oferta:", err);
     }
   };
 
+  // Iniciar transmisión
   const startBroadcast = async () => {
     if (!streamRef.current) {
       try {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
+        console.log("🎙️ Micrófono activado");
       } catch (err) {
         console.error("❌ No se pudo acceder al micrófono:", err);
         return;
       }
     }
+
+    // 🔑 Aquí notificamos al servidor que este cliente es Broadcaster
+    if (signalingServer.readyState === WebSocket.OPEN) {
+      signalingServer.send(JSON.stringify({ type: "broadcaster" }));
+      console.log("📤 Enviado al servidor: { type: 'broadcaster' }");
+    } else {
+      console.error("❌ WebSocket no está abierto, no se pudo enviar registro");
+    }
+
     setBroadcasting(true);
     console.log("🔴 Transmisión iniciada");
   };
