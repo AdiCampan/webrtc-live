@@ -12,17 +12,19 @@ function Broadcaster({ signalingServer }) {
       const data = JSON.parse(event.data);
       console.log("📩 Mensaje recibido en Broadcaster:", data);
 
+      // Un oyente pide una oferta
       if (data.type === "request-offer") {
-        console.log(`📡 Oyente ${data.clientId} pide oferta`);
         if (streamRef.current) {
+          console.log("📡 Nuevo oyente pidió oferta:", data.clientId);
           await createPeer(data.clientId);
         } else {
           console.warn(
-            "⚠️ Un oyente pidió oferta, pero no hay transmisión activa"
+            "⚠️ Oyente pidió oferta, pero no hay transmisión activa"
           );
         }
       }
 
+      // El oyente responde con una answer
       if (data.type === "answer") {
         const peer = peers.current[data.clientId];
         if (peer) {
@@ -30,19 +32,20 @@ function Broadcaster({ signalingServer }) {
             await peer.setRemoteDescription(
               new RTCSessionDescription(data.answer)
             );
-            console.log(`✅ Answer aplicada del oyente ${data.clientId}`);
+            console.log("✅ Answer aplicada de", data.clientId);
           } catch (err) {
             console.error("❌ Error al aplicar answer:", err);
           }
         }
       }
 
+      // Recibo un ICE candidate del oyente
       if (data.type === "candidate") {
         const peer = peers.current[data.clientId];
         if (peer) {
           try {
             await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-            console.log(`➕ Candidate agregado del oyente ${data.clientId}`);
+            console.log("✅ Candidate agregado de", data.clientId);
           } catch (err) {
             console.error("❌ Error agregando ICE candidate:", err);
           }
@@ -57,19 +60,23 @@ function Broadcaster({ signalingServer }) {
   // Crear conexión WebRTC con un oyente
   const createPeer = async (clientId) => {
     if (peers.current[clientId]) {
-      console.log("⚠️ Ya existe conexión con", clientId);
+      console.log("ℹ️ Ya existe conexión con", clientId);
       return;
     }
 
+    console.log("🆕 Creando PeerConnection para", clientId);
     const peer = new RTCPeerConnection();
     peers.current[clientId] = peer;
 
+    // Agregar tracks de audio
     streamRef.current.getTracks().forEach((track) => {
       peer.addTrack(track, streamRef.current);
     });
 
+    // Manejo de ICE candidates
     peer.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log("📤 Enviando candidate a", clientId);
         signalingServer.send(
           JSON.stringify({
             type: "candidate",
@@ -77,18 +84,18 @@ function Broadcaster({ signalingServer }) {
             target: clientId,
           })
         );
-        console.log(`📤 Enviando candidate al oyente ${clientId}`);
       }
     };
 
+    // Crear y enviar oferta
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
 
+      console.log("📤 Enviando oferta a", clientId);
       signalingServer.send(
         JSON.stringify({ type: "offer", offer, target: clientId })
       );
-      console.log(`📤 Oferta enviada al oyente ${clientId}`);
     } catch (err) {
       console.error("❌ Error creando oferta:", err);
     }
@@ -96,24 +103,27 @@ function Broadcaster({ signalingServer }) {
 
   // Iniciar transmisión
   const startBroadcast = async () => {
+    console.log("🟢 CLICK en Iniciar Transmisión");
+
     if (!streamRef.current) {
       try {
+        console.log("🎙️ Solicitando acceso al micrófono...");
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
-        console.log("🎙️ Micrófono activado");
+        console.log("✅ Micrófono listo");
       } catch (err) {
         console.error("❌ No se pudo acceder al micrófono:", err);
         return;
       }
     }
 
-    // 🔑 Aquí notificamos al servidor que este cliente es Broadcaster
+    console.log("📡 Estado del WebSocket:", signalingServer.readyState);
     if (signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(JSON.stringify({ type: "broadcaster" }));
       console.log("📤 Enviado al servidor: { type: 'broadcaster' }");
     } else {
-      console.error("❌ WebSocket no está abierto, no se pudo enviar registro");
+      console.error("❌ WebSocket no está abierto");
     }
 
     setBroadcasting(true);
@@ -123,10 +133,7 @@ function Broadcaster({ signalingServer }) {
   return (
     <div className="broadcaster-container">
       <button
-        onClick={() => {
-          console.log("🟢 CLICK en Iniciar Transmisión");
-          startBroadcast();
-        }}
+        onClick={startBroadcast}
         disabled={broadcasting}
         className="broadcast-btn"
       >
