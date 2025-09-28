@@ -1,100 +1,68 @@
 import React, { useEffect, useRef, useState } from "react";
 
+const rtcConfig = {
+  iceServers: [
+    { urls: "stun:stun.relay.metered.ca:80" },
+    {
+      urls: "turn:standard.relay.metered.ca:80",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:443",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+  ],
+};
+
 function Listener({ signalingServer }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
-  const canvasRef = useRef(null);
   const [connected, setConnected] = useState(false);
 
-  const rtcConfig = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      // Añadir TURN si tienes uno propio
-      // {
-      //   urls: "turn:TURN_SERVER_URL:3478",
-      //   username: "usuario",
-      //   credential: "contraseña",
-      // },
-    ],
-  };
-
   useEffect(() => {
-    let animationId;
-    let audioCtx, analyser, source, dataArrayFreq, dataArrayWave;
-
     const createPeer = () => {
       const peer = new RTCPeerConnection(rtcConfig);
       peerRef.current = peer;
 
+      peer.oniceconnectionstatechange = () => {
+        console.log("🔄 ICE state (Listener):", peer.iceConnectionState);
+      };
+
       peer.ontrack = (event) => {
+        console.log("🎶 Track recibido en Listener");
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
-          console.log("🎧 Stream recibido del Broadcaster");
-
-          audioCtx = new AudioContext();
-          analyser = audioCtx.createAnalyser();
-          source = audioCtx.createMediaStreamSource(event.streams[0]);
-          source.connect(analyser);
-
-          dataArrayFreq = new Uint8Array(analyser.frequencyBinCount);
-          dataArrayWave = new Uint8Array(analyser.fftSize);
-
-          draw();
         }
       };
 
       peer.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log("📤 Listener enviando candidate");
           signalingServer.send(
             JSON.stringify({ type: "candidate", candidate: event.candidate })
           );
-          console.log("📤 Candidate enviado al Broadcaster");
         }
       };
 
       return peer;
     };
 
-    const draw = () => {
-      if (!canvasRef.current || !analyser) return;
-
-      const ctx = canvasRef.current.getContext("2d");
-      const width = canvasRef.current.width;
-      const height = canvasRef.current.height;
-
-      ctx.clearRect(0, 0, width, height);
-
-      // Waveform
-      analyser.getByteTimeDomainData(dataArrayWave);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "lime";
-      ctx.beginPath();
-      let x = 0;
-      const sliceWidth = width / dataArrayWave.length;
-      for (let i = 0; i < dataArrayWave.length; i++) {
-        const v = dataArrayWave[i] / 128.0;
-        const y = (v * height) / 2;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        x += sliceWidth;
-      }
-      ctx.stroke();
-
-      // Spectrum
-      analyser.getByteFrequencyData(dataArrayFreq);
-      const barWidth = width / dataArrayFreq.length;
-      for (let i = 0; i < dataArrayFreq.length; i++) {
-        const barHeight = (dataArrayFreq[i] / 255) * height;
-        ctx.fillStyle = "rgba(0, 255, 255, 0.5)";
-        ctx.fillRect(i * barWidth, height - barHeight, barWidth, barHeight);
-      }
-
-      animationId = requestAnimationFrame(draw);
-    };
-
     signalingServer.onmessage = async (event) => {
       const data = JSON.parse(event.data);
+      console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
         if (peerRef.current) {
@@ -102,13 +70,13 @@ function Listener({ signalingServer }) {
             peerRef.current.close();
           } catch {}
         }
-
         const peer = createPeer();
+
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
         signalingServer.send(JSON.stringify({ type: "answer", answer }));
-        console.log("📤 Answer enviada al Broadcaster");
+        console.log("📤 Listener envió answer");
       }
 
       if (data.type === "candidate" && peerRef.current) {
@@ -116,17 +84,16 @@ function Listener({ signalingServer }) {
           await peerRef.current.addIceCandidate(
             new RTCIceCandidate(data.candidate)
           );
-          console.log("✅ Candidate agregado del Broadcaster");
+          console.log("✅ Candidate agregado en Listener");
         } catch (e) {
-          console.error("❌ Error agregando candidate:", e);
+          console.error("❌ Error agregando candidate en Listener", e);
         }
       }
     };
 
-    // Solicitar oferta al conectar
     const requestOffer = () => {
       signalingServer.send(JSON.stringify({ type: "request-offer" }));
-      console.log("📡 Oyente solicitó stream...");
+      console.log("📡 Listener solicitó oferta");
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {
@@ -137,8 +104,6 @@ function Listener({ signalingServer }) {
 
     return () => {
       if (peerRef.current) peerRef.current.close();
-      if (animationId) cancelAnimationFrame(animationId);
-      if (audioCtx) audioCtx.close();
     };
   }, [signalingServer]);
 
@@ -147,16 +112,6 @@ function Listener({ signalingServer }) {
       <h2>Oyente</h2>
       {!connected && <p>Esperando transmisión...</p>}
       <audio ref={audioRef} autoPlay controls />
-      <canvas
-        ref={canvasRef}
-        width={600}
-        height={200}
-        style={{
-          border: "1px solid black",
-          marginTop: "10px",
-          borderRadius: "15px",
-        }}
-      />
     </div>
   );
 }
