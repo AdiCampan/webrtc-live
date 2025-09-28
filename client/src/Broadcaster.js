@@ -1,30 +1,33 @@
 import React, { useRef, useEffect, useState } from "react";
 import "./Broadcaster.css";
 
+// Función para obtener credenciales TURN desde Metered
+const obtenerCredencialesTURN = async () => {
+  try {
+    const response = await fetch(
+      "https://webrtc-live-ct59.metered.live/api/v1/turn/credentials?apiKey=dafe83b1623c380eb0a596b67f4f26cec1b3"
+    );
+    const iceServers = await response.json();
+    console.log("✅ Credenciales TURN obtenidas:", iceServers);
+    return iceServers;
+  } catch (err) {
+    console.error("❌ Error obteniendo credenciales TURN:", err);
+    return []; // fallback: sin TURN
+  }
+};
+
 function Broadcaster({ signalingServer }) {
   const peers = useRef({});
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
 
-  // Configuración WebRTC con STUN/TURN
-  const rtcConfig = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      // Añadir TURN si tienes uno propio
-      // {
-      //   urls: "turn:TURN_SERVER_URL:3478",
-      //   username: "usuario",
-      //   credential: "contraseña",
-      // },
-    ],
-  };
-
-  // Manejar mensajes entrantes de WebSocket
+  // Manejar mensajes entrantes del servidor
   useEffect(() => {
     const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
       console.log("📩 Mensaje recibido en Broadcaster:", data);
 
+      // Nuevo oyente solicita oferta
       if (data.type === "request-offer") {
         if (streamRef.current) {
           console.log("📡 Nuevo oyente pidió oferta:", data.clientId);
@@ -36,6 +39,7 @@ function Broadcaster({ signalingServer }) {
         }
       }
 
+      // Respuesta del oyente
       if (data.type === "answer") {
         const peer = peers.current[data.clientId];
         if (peer) {
@@ -45,11 +49,12 @@ function Broadcaster({ signalingServer }) {
             );
             console.log("✅ Answer aplicada de", data.clientId);
           } catch (err) {
-            console.error("❌ Error al aplicar answer:", err);
+            console.error("❌ Error aplicando answer:", err);
           }
         }
       }
 
+      // ICE candidate entrante
       if (data.type === "candidate") {
         const peer = peers.current[data.clientId];
         if (peer) {
@@ -67,7 +72,7 @@ function Broadcaster({ signalingServer }) {
     return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
-  // Crear conexión WebRTC con un oyente
+  // Crear PeerConnection para un oyente
   const createPeer = async (clientId) => {
     if (peers.current[clientId]) {
       console.log("ℹ️ Ya existe conexión con", clientId);
@@ -75,6 +80,9 @@ function Broadcaster({ signalingServer }) {
     }
 
     console.log("🆕 Creando PeerConnection para", clientId);
+
+    // Obtener ICE servers con TURN
+    const rtcConfig = { iceServers: await obtenerCredencialesTURN() };
     const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
 
@@ -83,7 +91,7 @@ function Broadcaster({ signalingServer }) {
       peer.addTrack(track, streamRef.current);
     });
 
-    // Manejo de ICE candidates
+    // ICE candidates
     peer.onicecandidate = (event) => {
       if (event.candidate) {
         console.log("📤 Enviando candidate a", clientId);
@@ -101,7 +109,6 @@ function Broadcaster({ signalingServer }) {
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-
       console.log("📤 Enviando oferta a", clientId);
       signalingServer.send(
         JSON.stringify({ type: "offer", offer, target: clientId })
@@ -128,9 +135,10 @@ function Broadcaster({ signalingServer }) {
       }
     }
 
+    // Registrar Broadcaster en el servidor
     if (signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(JSON.stringify({ type: "broadcaster" }));
-      console.log("📤 Registrado como Broadcaster");
+      console.log("📤 Enviado al servidor: { type: 'broadcaster' }");
     } else {
       console.error("❌ WebSocket no está abierto");
     }
