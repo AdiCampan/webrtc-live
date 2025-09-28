@@ -28,26 +28,100 @@ const server = app.listen(PORT, () => {
 // WebSocket
 const wss = new WebSocketServer({ server });
 
+import express from "express";
+import { WebSocketServer } from "ws";
+import { v4 as uuidv4 } from "uuid";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// 🔹 Definir __dirname en ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+// Servir React build
+const clientBuildPath = path.join(__dirname, "../client/build");
+app.use(express.static(clientBuildPath));
+
+app.get("/*", (req, res) => {
+  res.sendFile(path.join(clientBuildPath, "index.html"));
+});
+
+// Iniciar servidor HTTP
+const server = app.listen(PORT, () => {
+  console.log(`Servidor HTTP + WebSocket escuchando en puerto ${PORT}`);
+});
+
+// WebSocket
+const wss = new WebSocketServer({ server });
+
+let broadcaster = null; // solo un Broadcaster
+
 wss.on("connection", (ws) => {
   ws.id = uuidv4();
   console.log(`🔗 Cliente conectado: ${ws.id}`);
   console.log(`Clientes conectados actualmente: ${wss.clients.size}`);
 
+  ws.isBroadcaster = false; // marcar si es Broadcaster
+
   ws.on("message", (msg) => {
-    const data = JSON.parse(msg.toString());
-    console.log(`📩 Mensaje recibido de ${ws.id}:`, msg.toString());
+    try {
+      const data = JSON.parse(msg.toString());
+      console.log(`📩 Mensaje recibido de ${ws.id}:`, data);
 
-    // Añadir el id del remitente a cada mensaje
-    data.clientId = ws.id;
-
-    // Reenviar a todos excepto quien lo envió
-    wss.clients.forEach((client) => {
-      if (client !== ws && client.readyState === ws.OPEN) {
-        client.send(JSON.stringify(data));
-        console.log(`➡️ Mensaje enviado a ${client.id}`);
+      // Registrar quién es Broadcaster
+      if (data.type === "broadcaster") {
+        ws.isBroadcaster = true;
+        broadcaster = ws;
+        console.log(`🎙️ Broadcaster registrado: ${ws.id}`);
+        return;
       }
-    });
+
+      // Si es request-offer, solo Broadcaster puede responder
+      if (data.type === "request-offer") {
+        if (broadcaster && broadcaster.readyState === ws.OPEN) {
+          // Enviar al Broadcaster que hay un nuevo oyente
+          broadcaster.send(JSON.stringify({ type: "request-offer", clientId: ws.id }));
+          console.log(`📡 Solicitud de oferta enviada al Broadcaster para oyente ${ws.id}`);
+        }
+        return;
+      }
+
+      // Reenviar messages entre Broadcaster y oyentes
+      if (data.target) {
+        // enviar a cliente específico
+        const targetClient = [...wss.clients].find(
+          (client) => client.id === data.target
+        );
+        if (targetClient && targetClient.readyState === ws.OPEN) {
+          targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
+          console.log(`➡️ Mensaje enviado a ${data.target} desde ${ws.id}`);
+        }
+        return;
+      }
+
+      // Reenviar a todos menos quien envió
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === ws.OPEN) {
+          client.send(JSON.stringify({ ...data, clientId: ws.id }));
+        }
+      });
+    } catch (err) {
+      console.error("❌ Error procesando mensaje:", err);
+    }
   });
+
+  ws.on("close", () => {
+    console.log(`❌ Cliente desconectado: ${ws.id}`);
+    if (ws.isBroadcaster) {
+      console.log("⚠️ Broadcaster desconectado");
+      broadcaster = null;
+    }
+  });
+});
+
 
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);

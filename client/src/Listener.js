@@ -11,17 +11,16 @@ function Listener({ signalingServer }) {
     let audioCtx, analyser, source, dataArrayFreq, dataArrayWave;
 
     const createPeer = () => {
-      console.log("🔧 Creando nuevo peer");
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
+      console.log("🔗 Listener PeerConnection creado");
 
       peer.ontrack = (event) => {
-        console.log("🎵 Stream recibido del broadcaster");
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
+          console.log("🎧 Reproduciendo audio del Broadcaster");
 
-          // Visualización de audio
           audioCtx = new AudioContext();
           analyser = audioCtx.createAnalyser();
           source = audioCtx.createMediaStreamSource(event.streams[0]);
@@ -36,13 +35,10 @@ function Listener({ signalingServer }) {
 
       peer.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log(
-            "📩 Enviando ICE candidate al servidor:",
-            event.candidate
-          );
           signalingServer.send(
             JSON.stringify({ type: "candidate", candidate: event.candidate })
           );
+          console.log("💬 Enviando ICE candidate al Broadcaster");
         }
       };
 
@@ -51,14 +47,11 @@ function Listener({ signalingServer }) {
 
     const draw = () => {
       if (!canvasRef.current || !analyser) return;
-
       const ctx = canvasRef.current.getContext("2d");
       const width = canvasRef.current.width;
       const height = canvasRef.current.height;
-
       ctx.clearRect(0, 0, width, height);
 
-      // Waveform
       analyser.getByteTimeDomainData(dataArrayWave);
       ctx.lineWidth = 2;
       ctx.strokeStyle = "lime";
@@ -74,7 +67,6 @@ function Listener({ signalingServer }) {
       }
       ctx.stroke();
 
-      // Spectrum
       analyser.getByteFrequencyData(dataArrayFreq);
       const barWidth = width / dataArrayFreq.length;
       for (let i = 0; i < dataArrayFreq.length; i++) {
@@ -88,45 +80,38 @@ function Listener({ signalingServer }) {
 
     signalingServer.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("📡 Mensaje recibido en Listener:", data);
+      console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
-        console.log("💡 Offer recibida, creando peer...");
         if (peerRef.current) {
           try {
-            await peerRef.current.close();
-            console.log("🔄 Peer anterior cerrado");
+            peerRef.current.close();
           } catch (e) {}
         }
         const peer = createPeer();
 
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
-        console.log("✅ RemoteDescription aplicada");
-
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        console.log("✅ LocalDescription (answer) creada y enviada");
-
         signalingServer.send(JSON.stringify({ type: "answer", answer }));
+        console.log("✅ Answer enviada al Broadcaster");
       }
 
       if (data.type === "candidate" && peerRef.current) {
         try {
-          console.log("📌 Candidate recibido del servidor:", data.candidate);
           await peerRef.current.addIceCandidate(
             new RTCIceCandidate(data.candidate)
           );
-          console.log("✅ Candidate agregado al peer");
+          console.log("💡 ICE candidate agregado");
         } catch (e) {
-          console.error("❌ Error al añadir candidate:", e);
+          console.error("❌ Error al agregar candidate", e);
         }
       }
     };
 
-    // Pedir al servidor una oferta al conectar
     const requestOffer = () => {
-      console.log("📢 Solicitud de oferta enviada al servidor");
       signalingServer.send(JSON.stringify({ type: "request-offer" }));
+      console.log("📡 Oyente solicitó stream");
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {

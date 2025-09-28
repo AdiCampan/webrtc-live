@@ -10,49 +10,41 @@ function Broadcaster({ signalingServer }) {
   useEffect(() => {
     const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("🟢 Broadcaster recibió mensaje:", data);
+      console.log("📩 Broadcaster recibió:", data);
 
-      // Un oyente pide una oferta
       if (data.type === "request-offer") {
-        console.log(`Solicitud de oferta de: ${data.clientId}`);
         if (streamRef.current) {
+          console.log(`🎯 Creando Peer para Listener ${data.clientId}`);
           await createPeer(data.clientId);
         } else {
           console.warn(
-            "Un oyente pidió oferta, pero no hay transmisión activa"
+            "⚠️ Un oyente pidió oferta, pero no hay transmisión activa"
           );
         }
       }
 
-      // El oyente responde con una answer
       if (data.type === "answer") {
         const peer = peers.current[data.clientId];
-        console.log(`Answer recibido de: ${data.clientId}`, data.answer);
         if (peer) {
           try {
+            console.log(`✅ Recibida answer de ${data.clientId}`);
             await peer.setRemoteDescription(
               new RTCSessionDescription(data.answer)
             );
-            console.log(`✅ Answer aplicada para ${data.clientId}`);
           } catch (err) {
-            console.error("Error al aplicar answer:", err);
+            console.error("❌ Error al aplicar answer:", err);
           }
         }
       }
 
-      // Recibo un ICE candidate del oyente
       if (data.type === "candidate") {
         const peer = peers.current[data.clientId];
-        console.log(
-          `ICE candidate recibido de: ${data.clientId}`,
-          data.candidate
-        );
         if (peer) {
           try {
+            console.log(`💡 Agregando ICE candidate de ${data.clientId}`);
             await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-            console.log(`✅ Candidate agregado para ${data.clientId}`);
           } catch (err) {
-            console.error("Error agregando ICE candidate:", err);
+            console.error("❌ Error agregando ICE candidate:", err);
           }
         }
       }
@@ -62,26 +54,22 @@ function Broadcaster({ signalingServer }) {
     return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
-  // Crear conexión WebRTC con un oyente
   const createPeer = async (clientId) => {
     if (peers.current[clientId]) {
-      console.log(`Ya existe conexión con ${clientId}`);
+      console.log("⚠️ Ya existe conexión con", clientId);
       return;
     }
 
-    console.log(`Creando peer para: ${clientId}`);
     const peer = new RTCPeerConnection();
     peers.current[clientId] = peer;
+    console.log("🔗 PeerConnection creado para", clientId);
 
-    // Agregar tracks de audio
     streamRef.current.getTracks().forEach((track) => {
       peer.addTrack(track, streamRef.current);
     });
 
-    // Manejo de ICE candidates
     peer.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`Enviando candidate a ${clientId}:`, event.candidate);
         signalingServer.send(
           JSON.stringify({
             type: "candidate",
@@ -89,33 +77,30 @@ function Broadcaster({ signalingServer }) {
             target: clientId,
           })
         );
+        console.log(`💬 Enviando ICE candidate a ${clientId}`);
       }
     };
 
-    // Crear y enviar oferta
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      console.log(`Enviando offer a ${clientId}:`, offer);
-
       signalingServer.send(
         JSON.stringify({ type: "offer", offer, target: clientId })
       );
+      console.log(`📡 Oferta enviada a ${clientId}`);
     } catch (err) {
-      console.error("Error creando oferta:", err);
+      console.error("❌ Error creando oferta:", err);
     }
   };
 
-  // Iniciar transmisión
   const startBroadcast = async () => {
     if (!streamRef.current) {
       try {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
-        console.log("🎤 Acceso a micrófono concedido");
       } catch (err) {
-        console.error("No se pudo acceder al micrófono:", err);
+        console.error("❌ No se pudo acceder al micrófono:", err);
         return;
       }
     }
