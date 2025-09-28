@@ -1,26 +1,25 @@
-import React, { useEffect, useRef } from "react";
-import { v4 as uuidv4 } from "uuid";
+import React, { useEffect, useRef, useState } from "react";
 
 function Listener({ signalingServer }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
   const canvasRef = useRef(null);
-  const clientId = useRef(uuidv4()); // ID único por pestaña/oyente
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    let peer = null;
     let animationId;
     let audioCtx, analyser, source, dataArrayFreq, dataArrayWave;
 
     const createPeer = () => {
-      peer = new RTCPeerConnection();
+      const peer = new RTCPeerConnection();
       peerRef.current = peer;
 
       peer.ontrack = (event) => {
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
+          setConnected(true);
 
-          // Configuración de visualización
+          // Visualización de audio
           audioCtx = new AudioContext();
           analyser = audioCtx.createAnalyser();
           source = audioCtx.createMediaStreamSource(event.streams[0]);
@@ -36,14 +35,12 @@ function Listener({ signalingServer }) {
       peer.onicecandidate = (event) => {
         if (event.candidate) {
           signalingServer.send(
-            JSON.stringify({
-              type: "candidate",
-              candidate: event.candidate,
-              clientId: clientId.current, // importante!
-            })
+            JSON.stringify({ type: "candidate", candidate: event.candidate })
           );
         }
       };
+
+      return peer;
     };
 
     const draw = () => {
@@ -83,29 +80,24 @@ function Listener({ signalingServer }) {
       animationId = requestAnimationFrame(draw);
     };
 
-    createPeer();
-
-    const handleMessage = async (event) => {
+    signalingServer.onmessage = async (event) => {
       const data = JSON.parse(event.data);
 
-      if (data.type === "offer" && data.target === clientId.current) {
+      if (data.type === "offer") {
         if (peerRef.current) {
           try {
             peerRef.current.close();
           } catch (e) {}
         }
-        createPeer();
-        peer = peerRef.current;
+        const peer = createPeer();
 
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        signalingServer.send(
-          JSON.stringify({ type: "answer", answer, clientId: clientId.current })
-        );
+        signalingServer.send(JSON.stringify({ type: "answer", answer }));
       }
 
-      if (data.type === "candidate" && data.target === clientId.current) {
+      if (data.type === "candidate" && peerRef.current) {
         try {
           await peerRef.current.addIceCandidate(
             new RTCIceCandidate(data.candidate)
@@ -116,14 +108,10 @@ function Listener({ signalingServer }) {
       }
     };
 
-    signalingServer.addEventListener("message", handleMessage);
-
-    // Solicitar oferta
+    // Pedir al servidor una oferta al conectar
     const requestOffer = () => {
-      signalingServer.send(
-        JSON.stringify({ type: "request-offer", clientId: clientId.current })
-      );
-      console.log("Solicitando stream al broadcaster...");
+      signalingServer.send(JSON.stringify({ type: "request-offer" }));
+      console.log("📡 Oyente solicitó stream...");
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {
@@ -133,7 +121,6 @@ function Listener({ signalingServer }) {
     }
 
     return () => {
-      signalingServer.removeEventListener("message", handleMessage);
       if (peerRef.current) peerRef.current.close();
       if (animationId) cancelAnimationFrame(animationId);
       if (audioCtx) audioCtx.close();
@@ -143,6 +130,7 @@ function Listener({ signalingServer }) {
   return (
     <div>
       <h2>Oyente</h2>
+      {!connected && <p>Esperando transmisión...</p>}
       <audio ref={audioRef} autoPlay controls />
       <canvas
         ref={canvasRef}

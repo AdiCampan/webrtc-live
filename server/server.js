@@ -28,51 +28,33 @@ const server = app.listen(PORT, () => {
 // WebSocket
 const wss = new WebSocketServer({ server });
 
-// Guardar clientes conectados
-const clients = new Map();
-
 wss.on("connection", (ws) => {
   ws.id = uuidv4();
-  clients.set(ws.id, ws);
-  console.log(`Cliente conectado: ${ws.id}`);
+  console.log(`✅ Cliente conectado: ${ws.id}`);
 
   ws.on("message", (msg) => {
-    let data;
-    try {
-      data = JSON.parse(msg);
-    } catch (e) {
-      console.error("Mensaje inválido:", msg.toString());
-      return;
-    }
+    const data = JSON.parse(msg.toString());
 
-    // Si el mensaje tiene target, enviarlo solo a ese cliente
-    if (data.target && clients.has(data.target)) {
-      clients.get(data.target).send(JSON.stringify({ ...data, from: ws.id }));
-      return;
-    }
+    // Añadir el id del remitente a cada mensaje
+    data.clientId = ws.id;
 
-    // Si es un "request-offer" de un Listener, reenviarlo al Broadcaster
-    if (data.type === "request-offer") {
-      // reenviar a todos los que no sean el que pidió
-      wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === ws.OPEN) {
-          client.send(JSON.stringify({ ...data, clientId: ws.id }));
-        }
-      });
-      return;
-    }
-
-    // Mensajes generales -> reenviar a todos excepto el remitente
+    // Reenviar a todos excepto quien lo envió
     wss.clients.forEach((client) => {
       if (client !== ws && client.readyState === ws.OPEN) {
-        client.send(JSON.stringify({ ...data, from: ws.id }));
+        client.send(JSON.stringify(data));
       }
     });
   });
 
   ws.on("close", () => {
-    clients.delete(ws.id);
-    console.log(`Cliente desconectado: ${ws.id}`);
+    console.log(`❌ Cliente desconectado: ${ws.id}`);
+
+    // Avisar al broadcaster para que libere el peer
+    wss.clients.forEach((client) => {
+      if (client.readyState === ws.OPEN) {
+        client.send(JSON.stringify({ type: "disconnect", clientId: ws.id }));
+      }
+    });
   });
 });
 
