@@ -132,15 +132,12 @@ function Broadcaster({ signalingServer }) {
 
   return (
     <div className="broadcaster-container">
-      {/* <button
+      <button
         onClick={startBroadcast}
         disabled={broadcasting}
         className="broadcast-btn"
       >
         {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
-      </button> */}
-      <button onClick={() => console.log("🔹 CLICK detectado")}>
-        Test Click
       </button>
 
       {broadcasting && (
