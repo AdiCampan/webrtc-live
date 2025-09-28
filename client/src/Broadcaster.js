@@ -6,11 +6,16 @@ function Broadcaster({ signalingServer }) {
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
 
-  // Configuración de STUN/TURN
+  // Configuración WebRTC con STUN/TURN
   const rtcConfig = {
     iceServers: [
-      { urls: "stun:stun.l.google.com:19302" }, // STUN público
-      // Para producción, considera agregar TURN server confiable
+      { urls: "stun:stun.l.google.com:19302" },
+      // Añadir TURN si tienes uno propio
+      // {
+      //   urls: "turn:TURN_SERVER_URL:3478",
+      //   username: "usuario",
+      //   credential: "contraseña",
+      // },
     ],
   };
 
@@ -20,7 +25,6 @@ function Broadcaster({ signalingServer }) {
       const data = JSON.parse(event.data);
       console.log("📩 Mensaje recibido en Broadcaster:", data);
 
-      // Un oyente pide una oferta
       if (data.type === "request-offer") {
         if (streamRef.current) {
           console.log("📡 Nuevo oyente pidió oferta:", data.clientId);
@@ -32,7 +36,6 @@ function Broadcaster({ signalingServer }) {
         }
       }
 
-      // El oyente responde con una answer
       if (data.type === "answer") {
         const peer = peers.current[data.clientId];
         if (peer) {
@@ -47,7 +50,6 @@ function Broadcaster({ signalingServer }) {
         }
       }
 
-      // Recibo un ICE candidate del oyente
       if (data.type === "candidate") {
         const peer = peers.current[data.clientId];
         if (peer) {
@@ -126,10 +128,9 @@ function Broadcaster({ signalingServer }) {
       }
     }
 
-    console.log("📡 Estado del WebSocket:", signalingServer.readyState);
     if (signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(JSON.stringify({ type: "broadcaster" }));
-      console.log("📤 Enviado al servidor: { type: 'broadcaster' }");
+      console.log("📤 Registrado como Broadcaster");
     } else {
       console.error("❌ WebSocket no está abierto");
     }

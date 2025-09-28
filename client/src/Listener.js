@@ -6,20 +6,31 @@ function Listener({ signalingServer }) {
   const canvasRef = useRef(null);
   const [connected, setConnected] = useState(false);
 
+  const rtcConfig = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      // Añadir TURN si tienes uno propio
+      // {
+      //   urls: "turn:TURN_SERVER_URL:3478",
+      //   username: "usuario",
+      //   credential: "contraseña",
+      // },
+    ],
+  };
+
   useEffect(() => {
     let animationId;
     let audioCtx, analyser, source, dataArrayFreq, dataArrayWave;
 
     const createPeer = () => {
-      const peer = new RTCPeerConnection();
+      const peer = new RTCPeerConnection(rtcConfig);
       peerRef.current = peer;
-      console.log("🔗 Listener PeerConnection creado");
 
       peer.ontrack = (event) => {
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
-          console.log("🎧 Reproduciendo audio del Broadcaster");
+          console.log("🎧 Stream recibido del Broadcaster");
 
           audioCtx = new AudioContext();
           analyser = audioCtx.createAnalyser();
@@ -38,7 +49,7 @@ function Listener({ signalingServer }) {
           signalingServer.send(
             JSON.stringify({ type: "candidate", candidate: event.candidate })
           );
-          console.log("💬 Enviando ICE candidate al Broadcaster");
+          console.log("📤 Candidate enviado al Broadcaster");
         }
       };
 
@@ -47,17 +58,20 @@ function Listener({ signalingServer }) {
 
     const draw = () => {
       if (!canvasRef.current || !analyser) return;
+
       const ctx = canvasRef.current.getContext("2d");
       const width = canvasRef.current.width;
       const height = canvasRef.current.height;
+
       ctx.clearRect(0, 0, width, height);
 
+      // Waveform
       analyser.getByteTimeDomainData(dataArrayWave);
       ctx.lineWidth = 2;
       ctx.strokeStyle = "lime";
       ctx.beginPath();
-      const sliceWidth = width / dataArrayWave.length;
       let x = 0;
+      const sliceWidth = width / dataArrayWave.length;
       for (let i = 0; i < dataArrayWave.length; i++) {
         const v = dataArrayWave[i] / 128.0;
         const y = (v * height) / 2;
@@ -67,6 +81,7 @@ function Listener({ signalingServer }) {
       }
       ctx.stroke();
 
+      // Spectrum
       analyser.getByteFrequencyData(dataArrayFreq);
       const barWidth = width / dataArrayFreq.length;
       for (let i = 0; i < dataArrayFreq.length; i++) {
@@ -80,21 +95,20 @@ function Listener({ signalingServer }) {
 
     signalingServer.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
         if (peerRef.current) {
           try {
             peerRef.current.close();
-          } catch (e) {}
+          } catch {}
         }
-        const peer = createPeer();
 
+        const peer = createPeer();
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
         signalingServer.send(JSON.stringify({ type: "answer", answer }));
-        console.log("✅ Answer enviada al Broadcaster");
+        console.log("📤 Answer enviada al Broadcaster");
       }
 
       if (data.type === "candidate" && peerRef.current) {
@@ -102,16 +116,17 @@ function Listener({ signalingServer }) {
           await peerRef.current.addIceCandidate(
             new RTCIceCandidate(data.candidate)
           );
-          console.log("💡 ICE candidate agregado");
+          console.log("✅ Candidate agregado del Broadcaster");
         } catch (e) {
-          console.error("❌ Error al agregar candidate", e);
+          console.error("❌ Error agregando candidate:", e);
         }
       }
     };
 
+    // Solicitar oferta al conectar
     const requestOffer = () => {
       signalingServer.send(JSON.stringify({ type: "request-offer" }));
-      console.log("📡 Oyente solicitó stream");
+      console.log("📡 Oyente solicitó stream...");
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {
