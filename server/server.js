@@ -4,36 +4,6 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Definir __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = process.env.PORT || 8080;
-
-// Servir React build
-const clientBuildPath = path.join(__dirname, "../client/build");
-app.use(express.static(clientBuildPath));
-
-// Para cualquier ruta que no coincida, devolver index.html
-app.get("/*", (req, res) => {
-  res.sendFile(path.join(clientBuildPath, "index.html"));
-});
-
-// Iniciar servidor HTTP
-const server = app.listen(PORT, () => {
-  console.log(`Servidor escuchando en puerto ${PORT}`);
-});
-
-// WebSocket
-const wss = new WebSocketServer({ server });
-
-import express from "express";
-import { WebSocketServer } from "ws";
-import { v4 as uuidv4 } from "uuid";
-import path from "path";
-import { fileURLToPath } from "url";
-
 // 🔹 Definir __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,8 +53,12 @@ wss.on("connection", (ws) => {
       if (data.type === "request-offer") {
         if (broadcaster && broadcaster.readyState === ws.OPEN) {
           // Enviar al Broadcaster que hay un nuevo oyente
-          broadcaster.send(JSON.stringify({ type: "request-offer", clientId: ws.id }));
-          console.log(`📡 Solicitud de oferta enviada al Broadcaster para oyente ${ws.id}`);
+          broadcaster.send(
+            JSON.stringify({ type: "request-offer", clientId: ws.id })
+          );
+          console.log(
+            `📡 Solicitud de oferta enviada al Broadcaster para oyente ${ws.id}`
+          );
         }
         return;
       }
@@ -119,20 +93,6 @@ wss.on("connection", (ws) => {
       console.log("⚠️ Broadcaster desconectado");
       broadcaster = null;
     }
-  });
-});
-
-
-  ws.on("close", () => {
-    console.log(`❌ Cliente desconectado: ${ws.id}`);
-    console.log(`Clientes restantes: ${wss.clients.size}`);
-
-    // Avisar al broadcaster para que libere el peer
-    wss.clients.forEach((client) => {
-      if (client.readyState === ws.OPEN) {
-        client.send(JSON.stringify({ type: "disconnect", clientId: ws.id }));
-      }
-    });
   });
 });
 
