@@ -123,7 +123,10 @@ function Broadcaster({ signalingServer }) {
   return (
     <div className="broadcaster-container">
       <button
-        onClick={startBroadcast}
+        onClick={() => {
+          console.log("🟢 CLICK en Iniciar Transmisión");
+          startBroadcast();
+        }}
         disabled={broadcasting}
         className="broadcast-btn"
       >
