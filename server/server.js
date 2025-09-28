@@ -4,14 +4,14 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// 🔹 Definir __dirname en ES Modules
+// Definir __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// 📦 Servir React build
+// Servir React build
 const clientBuildPath = path.join(__dirname, "../client/build");
 app.use(express.static(clientBuildPath));
 
@@ -20,47 +20,59 @@ app.get("/*", (req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
-// 🚀 Iniciar servidor HTTP
+// Iniciar servidor HTTP
 const server = app.listen(PORT, () => {
-  console.log(`Servidor HTTP + WebSocket escuchando en puerto ${PORT}`);
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
 
-// 🎧 Iniciar WebSocket
+// WebSocket
 const wss = new WebSocketServer({ server });
+
+// Guardar clientes conectados
+const clients = new Map();
 
 wss.on("connection", (ws) => {
   ws.id = uuidv4();
-  console.log(`🔗 Cliente conectado: ${ws.id}`);
+  clients.set(ws.id, ws);
+  console.log(`Cliente conectado: ${ws.id}`);
 
   ws.on("message", (msg) => {
     let data;
     try {
-      data = JSON.parse(msg.toString());
+      data = JSON.parse(msg);
     } catch (e) {
       console.error("Mensaje inválido:", msg.toString());
       return;
     }
 
-    // Si existe un target, enviar solo a ese cliente
-    if (data.target) {
-      const targetClient = [...wss.clients].find(
-        (c) => c.id === data.target && c.readyState === ws.OPEN
-      );
-      if (targetClient) {
-        targetClient.send(JSON.stringify(data));
-      }
-    } else {
-      // Si no hay target, reenviar a todos excepto el que envió
+    // Si el mensaje tiene target, enviarlo solo a ese cliente
+    if (data.target && clients.has(data.target)) {
+      clients.get(data.target).send(JSON.stringify({ ...data, from: ws.id }));
+      return;
+    }
+
+    // Si es un "request-offer" de un Listener, reenviarlo al Broadcaster
+    if (data.type === "request-offer") {
+      // reenviar a todos los que no sean el que pidió
       wss.clients.forEach((client) => {
         if (client !== ws && client.readyState === ws.OPEN) {
-          client.send(JSON.stringify(data));
+          client.send(JSON.stringify({ ...data, clientId: ws.id }));
         }
       });
+      return;
     }
+
+    // Mensajes generales -> reenviar a todos excepto el remitente
+    wss.clients.forEach((client) => {
+      if (client !== ws && client.readyState === ws.OPEN) {
+        client.send(JSON.stringify({ ...data, from: ws.id }));
+      }
+    });
   });
 
   ws.on("close", () => {
-    console.log(`❌ Cliente desconectado: ${ws.id}`);
+    clients.delete(ws.id);
+    console.log(`Cliente desconectado: ${ws.id}`);
   });
 });
 

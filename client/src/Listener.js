@@ -5,7 +5,7 @@ function Listener({ signalingServer }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
   const canvasRef = useRef(null);
-  const clientIdRef = useRef(uuidv4()); // Identificador único para este listener
+  const clientId = useRef(uuidv4()); // ID único por pestaña/oyente
 
   useEffect(() => {
     let peer = null;
@@ -39,7 +39,7 @@ function Listener({ signalingServer }) {
             JSON.stringify({
               type: "candidate",
               candidate: event.candidate,
-              target: clientIdRef.current,
+              clientId: clientId.current, // importante!
             })
           );
         }
@@ -85,13 +85,13 @@ function Listener({ signalingServer }) {
 
     createPeer();
 
-    signalingServer.onmessage = async (event) => {
+    const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
 
-      if (data.type === "offer" && data.target === clientIdRef.current) {
+      if (data.type === "offer" && data.target === clientId.current) {
         if (peerRef.current) {
           try {
-            await peerRef.current.close();
+            peerRef.current.close();
           } catch (e) {}
         }
         createPeer();
@@ -101,15 +101,11 @@ function Listener({ signalingServer }) {
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
         signalingServer.send(
-          JSON.stringify({
-            type: "answer",
-            answer,
-            clientId: clientIdRef.current,
-          })
+          JSON.stringify({ type: "answer", answer, clientId: clientId.current })
         );
       }
 
-      if (data.type === "candidate" && peerRef.current) {
+      if (data.type === "candidate" && data.target === clientId.current) {
         try {
           await peerRef.current.addIceCandidate(
             new RTCIceCandidate(data.candidate)
@@ -120,12 +116,14 @@ function Listener({ signalingServer }) {
       }
     };
 
-    // Solicitar oferta al conectar
+    signalingServer.addEventListener("message", handleMessage);
+
+    // Solicitar oferta
     const requestOffer = () => {
       signalingServer.send(
-        JSON.stringify({ type: "request-offer", clientId: clientIdRef.current })
+        JSON.stringify({ type: "request-offer", clientId: clientId.current })
       );
-      console.log("Solicitando stream al intérprete...");
+      console.log("Solicitando stream al broadcaster...");
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {
@@ -135,6 +133,7 @@ function Listener({ signalingServer }) {
     }
 
     return () => {
+      signalingServer.removeEventListener("message", handleMessage);
       if (peerRef.current) peerRef.current.close();
       if (animationId) cancelAnimationFrame(animationId);
       if (audioCtx) audioCtx.close();

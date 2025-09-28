@@ -6,21 +6,19 @@ function Broadcaster({ signalingServer }) {
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
 
-  // Manejar mensajes entrantes de WebSocket
   useEffect(() => {
     const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
 
-      // Alguien solicita oferta para WebRTC
+      // Oyente pide oferta
       if (data.type === "request-offer") {
-        const clientId = data.clientId;
         if (!streamRef.current) return;
-        if (!peers.current[clientId]) {
-          await createPeer(clientId);
+        if (!peers.current[data.clientId]) {
+          await createPeer(data.clientId);
         }
       }
 
-      // Respuesta de un oyente
+      // Recibir respuesta (answer)
       if (data.type === "answer") {
         const peer = peers.current[data.clientId];
         if (peer) {
@@ -30,7 +28,7 @@ function Broadcaster({ signalingServer }) {
         }
       }
 
-      // Nuevo ICE candidate
+      // Recibir ICE candidate
       if (data.type === "candidate") {
         const peer = peers.current[data.clientId];
         if (peer) {
@@ -47,17 +45,15 @@ function Broadcaster({ signalingServer }) {
     return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
-  // Crear conexión WebRTC con un oyente
   const createPeer = async (clientId) => {
     const peer = new RTCPeerConnection();
     peers.current[clientId] = peer;
 
-    // Agregar tracks de audio al peer
+    // Agregar el audio del broadcaster
     streamRef.current.getTracks().forEach((track) => {
       peer.addTrack(track, streamRef.current);
     });
 
-    // Enviar ICE candidates al oyente
     peer.onicecandidate = (event) => {
       if (event.candidate) {
         signalingServer.send(
@@ -80,7 +76,6 @@ function Broadcaster({ signalingServer }) {
     );
   };
 
-  // Iniciar transmisión
   const startBroadcast = async () => {
     if (!streamRef.current) {
       try {
