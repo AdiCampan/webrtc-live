@@ -6,6 +6,14 @@ function Broadcaster({ signalingServer }) {
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
 
+  // Configuración de STUN/TURN
+  const rtcConfig = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" }, // STUN público
+      // Para producción, considera agregar TURN server confiable
+    ],
+  };
+
   // Manejar mensajes entrantes de WebSocket
   useEffect(() => {
     const handleMessage = async (event) => {
@@ -65,7 +73,7 @@ function Broadcaster({ signalingServer }) {
     }
 
     console.log("🆕 Creando PeerConnection para", clientId);
-    const peer = new RTCPeerConnection();
+    const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
 
     // Agregar tracks de audio
