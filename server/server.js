@@ -30,10 +30,12 @@ const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   ws.id = uuidv4();
-  console.log(`✅ Cliente conectado: ${ws.id}`);
+  console.log(`🔗 Cliente conectado: ${ws.id}`);
+  console.log(`Clientes conectados actualmente: ${wss.clients.size}`);
 
   ws.on("message", (msg) => {
     const data = JSON.parse(msg.toString());
+    console.log(`📩 Mensaje recibido de ${ws.id}:`, msg.toString());
 
     // Añadir el id del remitente a cada mensaje
     data.clientId = ws.id;
@@ -42,12 +44,14 @@ wss.on("connection", (ws) => {
     wss.clients.forEach((client) => {
       if (client !== ws && client.readyState === ws.OPEN) {
         client.send(JSON.stringify(data));
+        console.log(`➡️ Mensaje enviado a ${client.id}`);
       }
     });
   });
 
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
+    console.log(`Clientes restantes: ${wss.clients.size}`);
 
     // Avisar al broadcaster para que libere el peer
     wss.clients.forEach((client) => {
