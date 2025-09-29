@@ -1,28 +1,30 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const iceServers = [
-  { urls: "stun:stun.relay.metered.ca:80" },
-  {
-    urls: "turn:standard.relay.metered.ca:80",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-  {
-    urls: "turn:standard.relay.metered.ca:80?transport=tcp",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-  {
-    urls: "turn:standard.relay.metered.ca:443",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-  {
-    urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-];
+const rtcConfig = {
+  iceServers: [
+    { urls: "stun:stun.relay.metered.ca:80" },
+    {
+      urls: "turn:standard.relay.metered.ca:80",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:443",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+  ],
+};
 
 function Listener({ signalingServer }) {
   const peerRef = useRef(null);
@@ -31,12 +33,15 @@ function Listener({ signalingServer }) {
 
   useEffect(() => {
     const createPeer = () => {
-      console.log("🆕 Creando PeerConnection con ICE servers (Listener)");
-      const peer = new RTCPeerConnection({ iceServers });
+      const peer = new RTCPeerConnection(rtcConfig);
       peerRef.current = peer;
 
+      peer.oniceconnectionstatechange = () => {
+        console.log("🔄 ICE state (Listener):", peer.iceConnectionState);
+      };
+
       peer.ontrack = (event) => {
-        console.log("🎶 Recibiendo audio remoto...");
+        console.log("🎶 Track recibido en Listener");
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
@@ -45,15 +50,10 @@ function Listener({ signalingServer }) {
 
       peer.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log(
-            "📤 Enviando ICE candidate al Broadcaster:",
-            event.candidate.candidate
-          );
+          console.log("📤 Listener enviando candidate");
           signalingServer.send(
             JSON.stringify({ type: "candidate", candidate: event.candidate })
           );
-        } else {
-          console.log("✅ Recolección de ICE completada (Listener)");
         }
       };
 
@@ -62,13 +62,13 @@ function Listener({ signalingServer }) {
 
     signalingServer.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("📩 [Listener] Mensaje recibido:", data);
+      console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
         if (peerRef.current) {
           try {
             peerRef.current.close();
-          } catch (e) {}
+          } catch {}
         }
         const peer = createPeer();
 
@@ -76,7 +76,7 @@ function Listener({ signalingServer }) {
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
         signalingServer.send(JSON.stringify({ type: "answer", answer }));
-        console.log("📤 Enviada answer al Broadcaster");
+        console.log("📤 Listener envió answer");
       }
 
       if (data.type === "candidate" && peerRef.current) {
@@ -84,16 +84,16 @@ function Listener({ signalingServer }) {
           await peerRef.current.addIceCandidate(
             new RTCIceCandidate(data.candidate)
           );
-          console.log("✅ Candidate agregado (Listener)");
+          console.log("✅ Candidate agregado en Listener");
         } catch (e) {
-          console.error("❌ Error al añadir candidate", e);
+          console.error("❌ Error agregando candidate en Listener", e);
         }
       }
     };
 
     const requestOffer = () => {
       signalingServer.send(JSON.stringify({ type: "request-offer" }));
-      console.log("📡 Listener solicitó stream al Broadcaster");
+      console.log("📡 Listener solicitó oferta");
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {

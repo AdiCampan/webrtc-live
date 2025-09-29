@@ -1,48 +1,49 @@
 import React, { useRef, useEffect, useState } from "react";
 import "./Broadcaster.css";
 
-const iceServers = [
-  { urls: "stun:stun.relay.metered.ca:80" },
-  {
-    urls: "turn:standard.relay.metered.ca:80",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-  {
-    urls: "turn:standard.relay.metered.ca:80?transport=tcp",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-  {
-    urls: "turn:standard.relay.metered.ca:443",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-  {
-    urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-    username: "a84708960fcf4892420ec951",
-    credential: "TXNIBjBYy24WPj2r",
-  },
-];
+const rtcConfig = {
+  iceServers: [
+    { urls: "stun:stun.relay.metered.ca:80" },
+    {
+      urls: "turn:standard.relay.metered.ca:80",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turn:standard.relay.metered.ca:443",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+    {
+      urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+      username: "a84708960fcf4892420ec951",
+      credential: "TXNIBjBYy24WPj2r",
+    },
+  ],
+};
 
 function Broadcaster({ signalingServer }) {
   const peers = useRef({});
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
 
+  // Manejar mensajes entrantes de WebSocket
   useEffect(() => {
     const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("📩 [Broadcaster] Mensaje recibido:", data);
+      console.log("📩 Broadcaster recibió:", data);
 
       if (data.type === "request-offer") {
         if (streamRef.current) {
-          console.log("📡 Nuevo oyente pidió oferta:", data.clientId);
+          console.log("📡 Oyente pidió oferta:", data.clientId);
           await createPeer(data.clientId);
         } else {
-          console.warn(
-            "⚠️ Oyente pidió oferta, pero no hay transmisión activa"
-          );
+          console.warn("⚠️ No hay transmisión activa para responder");
         }
       }
 
@@ -77,15 +78,21 @@ function Broadcaster({ signalingServer }) {
     return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
+  // Crear conexión WebRTC con un oyente
   const createPeer = async (clientId) => {
     if (peers.current[clientId]) {
-      console.log("ℹ️ Ya existe conexión con", clientId);
+      console.log("ℹ️ Ya existe peer con", clientId);
       return;
     }
 
-    console.log("🆕 Creando PeerConnection con ICE servers para", clientId);
-    const peer = new RTCPeerConnection({ iceServers });
+    console.log("🆕 Creando PeerConnection para", clientId);
+    const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
+
+    // Log de estados ICE
+    peer.oniceconnectionstatechange = () => {
+      console.log(`🔄 ICE state con ${clientId}:`, peer.iceConnectionState);
+    };
 
     streamRef.current.getTracks().forEach((track) => {
       peer.addTrack(track, streamRef.current);
@@ -93,10 +100,7 @@ function Broadcaster({ signalingServer }) {
 
     peer.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(
-          "📤 Enviando ICE candidate al oyente:",
-          event.candidate.candidate
-        );
+        console.log("📤 Enviando candidate a", clientId);
         signalingServer.send(
           JSON.stringify({
             type: "candidate",
@@ -104,8 +108,6 @@ function Broadcaster({ signalingServer }) {
             target: clientId,
           })
         );
-      } else {
-        console.log("✅ Recolección de ICE completada (Broadcaster)");
       }
     };
 
@@ -113,7 +115,7 @@ function Broadcaster({ signalingServer }) {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
 
-      console.log("📤 Enviando oferta a", clientId);
+      console.log("📤 Enviando offer a", clientId);
       signalingServer.send(
         JSON.stringify({ type: "offer", offer, target: clientId })
       );
@@ -122,31 +124,31 @@ function Broadcaster({ signalingServer }) {
     }
   };
 
+  // Iniciar transmisión
   const startBroadcast = async () => {
     console.log("🟢 CLICK en Iniciar Transmisión");
 
     if (!streamRef.current) {
       try {
-        console.log("🎙️ Solicitando acceso al micrófono...");
+        console.log("🎙️ Solicitando micrófono...");
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
         console.log("✅ Micrófono listo");
       } catch (err) {
-        console.error("❌ No se pudo acceder al micrófono:", err);
+        console.error("❌ Error accediendo micrófono:", err);
         return;
       }
     }
 
     if (signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(JSON.stringify({ type: "broadcaster" }));
-      console.log("📤 Enviado al servidor: { type: 'broadcaster' }");
+      console.log("📤 Registrado como Broadcaster");
     } else {
-      console.error("❌ WebSocket no está abierto");
+      console.error("❌ WebSocket no abierto");
     }
 
     setBroadcasting(true);
-    console.log("🔴 Transmisión iniciada");
   };
 
   return (
@@ -158,6 +160,10 @@ function Broadcaster({ signalingServer }) {
       >
         {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
       </button>
+
+      {broadcasting && (
+        <div className="broadcasting-text">Tu transmisión está activa</div>
+      )}
     </div>
   );
 }
