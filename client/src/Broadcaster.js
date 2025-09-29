@@ -32,7 +32,7 @@ function Broadcaster({ signalingServer }) {
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
 
-  // Visualizador (Broadcaster)
+  // Visualizador
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
@@ -40,7 +40,7 @@ function Broadcaster({ signalingServer }) {
   const dataWaveRef = useRef(null);
   const animRef = useRef(null);
 
-  // Manejar mensajes entrantes de WebSocket
+  // Manejar mensajes WebSocket
   useEffect(() => {
     const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
@@ -86,25 +86,21 @@ function Broadcaster({ signalingServer }) {
     return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
-  // Crear conexión WebRTC con un oyente
+  // Crear PeerConnection
   const createPeer = async (clientId) => {
-    if (peers.current[clientId]) {
-      console.log("ℹ️ Ya existe peer con", clientId);
-      return;
-    }
+    if (peers.current[clientId]) return;
 
     console.log("🆕 Creando PeerConnection para", clientId);
     const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
 
-    // Log de estados ICE
     peer.oniceconnectionstatechange = () => {
       console.log(`🔄 ICE state con ${clientId}:`, peer.iceConnectionState);
     };
 
-    streamRef.current.getTracks().forEach((track) => {
-      peer.addTrack(track, streamRef.current);
-    });
+    streamRef.current
+      .getTracks()
+      .forEach((track) => peer.addTrack(track, streamRef.current));
 
     peer.onicecandidate = (event) => {
       if (event.candidate) {
@@ -122,7 +118,6 @@ function Broadcaster({ signalingServer }) {
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-
       console.log("📤 Enviando offer a", clientId);
       signalingServer.send(
         JSON.stringify({ type: "offer", offer, target: clientId })
@@ -143,72 +138,69 @@ function Broadcaster({ signalingServer }) {
           audio: true,
         });
         console.log("✅ Micrófono listo");
-        // === Visualizer setup (no invasive) ===
-        try {
-          if (!audioCtxRef.current) {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            audioCtxRef.current = new AudioCtx();
 
-            const analyser = audioCtxRef.current.createAnalyser();
-            analyser.fftSize = 2048; // buena resolución en desktop; puedes usar 1024 para menos carga
-            analyserRef.current = analyser;
+        // === Configurar visualizador ===
+        if (!audioCtxRef.current) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          audioCtxRef.current = new AudioCtx();
 
-            const src = audioCtxRef.current.createMediaStreamSource(
-              streamRef.current
-            );
-            src.connect(analyser);
+          const analyser = audioCtxRef.current.createAnalyser();
+          analyser.fftSize = 1024; // menor carga para móviles
+          analyserRef.current = analyser;
 
-            dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
-            dataWaveRef.current = new Uint8Array(analyser.fftSize);
+          const src = audioCtxRef.current.createMediaStreamSource(
+            streamRef.current
+          );
+          src.connect(analyser);
 
-            const draw = () => {
-              const canvas = canvasRef.current;
-              const analyserLocal = analyserRef.current;
-              if (!canvas || !analyserLocal) return;
+          dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
+          dataWaveRef.current = new Uint8Array(analyser.fftSize);
 
-              const ctx = canvas.getContext("2d");
-              const width = canvas.width;
-              const height = canvas.height;
-              ctx.clearRect(0, 0, width, height);
+          const draw = () => {
+            const canvas = canvasRef.current;
+            const analyserLocal = analyserRef.current;
+            if (!canvas || !analyserLocal) return;
 
-              // Waveform
-              analyserLocal.getByteTimeDomainData(dataWaveRef.current);
-              ctx.lineWidth = 2;
-              ctx.strokeStyle = "lime";
-              ctx.beginPath();
-              const slice = width / dataWaveRef.current.length;
-              let x = 0;
-              for (let i = 0; i < dataWaveRef.current.length; i++) {
-                const v = dataWaveRef.current[i] / 128.0;
-                const y = (v * height) / 2;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-                x += slice;
-              }
-              ctx.stroke();
+            const ctx = canvas.getContext("2d");
+            const width = canvas.width;
+            const height = canvas.height;
+            ctx.clearRect(0, 0, width, height);
 
-              // Spectrum
-              analyserLocal.getByteFrequencyData(dataFreqRef.current);
-              const barWidth = Math.max(1, width / dataFreqRef.current.length);
-              for (let i = 0; i < dataFreqRef.current.length; i++) {
-                const barHeight = (dataFreqRef.current[i] / 255) * height;
-                ctx.fillStyle = "rgba(0,255,255,0.4)";
-                ctx.fillRect(
-                  i * barWidth,
-                  height - barHeight,
-                  barWidth,
-                  barHeight
-                );
-              }
+            // Waveform
+            analyserLocal.getByteTimeDomainData(dataWaveRef.current);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "lime";
+            ctx.beginPath();
+            let x = 0;
+            const slice = width / dataWaveRef.current.length;
+            for (let i = 0; i < dataWaveRef.current.length; i++) {
+              const v = dataWaveRef.current[i] / 128.0;
+              const y = (v * height) / 2;
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+              x += slice;
+            }
+            ctx.stroke();
 
-              animRef.current = requestAnimationFrame(draw);
-            };
+            // Spectrum
+            analyserLocal.getByteFrequencyData(dataFreqRef.current);
+            const barWidth = Math.max(1, width / dataFreqRef.current.length);
+            for (let i = 0; i < dataFreqRef.current.length; i++) {
+              const barHeight = (dataFreqRef.current[i] / 255) * height;
+              ctx.fillStyle = "rgba(0,255,255,0.4)";
+              ctx.fillRect(
+                i * barWidth,
+                height - barHeight,
+                barWidth,
+                barHeight
+              );
+            }
 
             animRef.current = requestAnimationFrame(draw);
-            console.log("🔎 Visualizer Broadcaster iniciado");
-          }
-        } catch (err) {
-          console.warn("⚠️ Error iniciando visualizer (no crítico):", err);
+          };
+
+          animRef.current = requestAnimationFrame(draw);
+          console.log("🔎 Visualizer Broadcaster iniciado");
         }
       } catch (err) {
         console.error("❌ Error accediendo micrófono:", err);
@@ -226,6 +218,7 @@ function Broadcaster({ signalingServer }) {
     setBroadcasting(true);
   };
 
+  // Limpiar visualizador al desmontar
   useEffect(() => {
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
