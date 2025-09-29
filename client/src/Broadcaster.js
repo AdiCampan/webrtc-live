@@ -32,6 +32,14 @@ function Broadcaster({ signalingServer }) {
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
 
+  // Visualizador (Broadcaster)
+  const canvasRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+  const dataFreqRef = useRef(null);
+  const dataWaveRef = useRef(null);
+  const animRef = useRef(null);
+
   // Manejar mensajes entrantes de WebSocket
   useEffect(() => {
     const handleMessage = async (event) => {
@@ -135,6 +143,73 @@ function Broadcaster({ signalingServer }) {
           audio: true,
         });
         console.log("✅ Micrófono listo");
+        // === Visualizer setup (no invasive) ===
+        try {
+          if (!audioCtxRef.current) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            audioCtxRef.current = new AudioCtx();
+
+            const analyser = audioCtxRef.current.createAnalyser();
+            analyser.fftSize = 2048; // buena resolución en desktop; puedes usar 1024 para menos carga
+            analyserRef.current = analyser;
+
+            const src = audioCtxRef.current.createMediaStreamSource(
+              streamRef.current
+            );
+            src.connect(analyser);
+
+            dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
+            dataWaveRef.current = new Uint8Array(analyser.fftSize);
+
+            const draw = () => {
+              const canvas = canvasRef.current;
+              const analyserLocal = analyserRef.current;
+              if (!canvas || !analyserLocal) return;
+
+              const ctx = canvas.getContext("2d");
+              const width = canvas.width;
+              const height = canvas.height;
+              ctx.clearRect(0, 0, width, height);
+
+              // Waveform
+              analyserLocal.getByteTimeDomainData(dataWaveRef.current);
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = "lime";
+              ctx.beginPath();
+              const slice = width / dataWaveRef.current.length;
+              let x = 0;
+              for (let i = 0; i < dataWaveRef.current.length; i++) {
+                const v = dataWaveRef.current[i] / 128.0;
+                const y = (v * height) / 2;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+                x += slice;
+              }
+              ctx.stroke();
+
+              // Spectrum
+              analyserLocal.getByteFrequencyData(dataFreqRef.current);
+              const barWidth = Math.max(1, width / dataFreqRef.current.length);
+              for (let i = 0; i < dataFreqRef.current.length; i++) {
+                const barHeight = (dataFreqRef.current[i] / 255) * height;
+                ctx.fillStyle = "rgba(0,255,255,0.4)";
+                ctx.fillRect(
+                  i * barWidth,
+                  height - barHeight,
+                  barWidth,
+                  barHeight
+                );
+              }
+
+              animRef.current = requestAnimationFrame(draw);
+            };
+
+            animRef.current = requestAnimationFrame(draw);
+            console.log("🔎 Visualizer Broadcaster iniciado");
+          }
+        } catch (err) {
+          console.warn("⚠️ Error iniciando visualizer (no crítico):", err);
+        }
       } catch (err) {
         console.error("❌ Error accediendo micrófono:", err);
         return;
@@ -151,6 +226,15 @@ function Broadcaster({ signalingServer }) {
     setBroadcasting(true);
   };
 
+  useEffect(() => {
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+        audioCtxRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
+
   return (
     <div className="broadcaster-container">
       <button
@@ -162,7 +246,19 @@ function Broadcaster({ signalingServer }) {
       </button>
 
       {broadcasting && (
-        <div className="broadcasting-text">Tu transmisión está activa</div>
+        <>
+          <div className="broadcasting-text">Tu transmisión está activa</div>
+          <canvas
+            ref={canvasRef}
+            width={600}
+            height={200}
+            style={{
+              border: "1px solid black",
+              marginTop: "10px",
+              borderRadius: "15px",
+            }}
+          />
+        </>
       )}
     </div>
   );

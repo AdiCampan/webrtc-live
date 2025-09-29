@@ -30,6 +30,12 @@ function Listener({ signalingServer }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
   const [connected, setConnected] = useState(false);
+  const canvasRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+  const dataFreqRef = useRef(null);
+  const dataWaveRef = useRef(null);
+  const animRef = useRef(null);
 
   useEffect(() => {
     const createPeer = () => {
@@ -45,6 +51,73 @@ function Listener({ signalingServer }) {
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
+          // === Visualizer setup (Listener) ===
+          try {
+            if (!audioCtxRef.current) {
+              const AudioCtx = window.AudioContext || window.webkitAudioContext;
+              audioCtxRef.current = new AudioCtx();
+
+              const analyser = audioCtxRef.current.createAnalyser();
+              analyser.fftSize = 512; // menos carga para móviles
+              analyserRef.current = analyser;
+
+              const src = audioCtxRef.current.createMediaStreamSource(
+                event.streams[0]
+              );
+              src.connect(analyser);
+
+              dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
+              dataWaveRef.current = new Uint8Array(analyser.fftSize);
+
+              const draw = () => {
+                const canvas = canvasRef.current;
+                const analyserLocal = analyserRef.current;
+                if (!canvas || !analyserLocal) return;
+
+                const ctx = canvas.getContext("2d");
+                const width = canvas.width;
+                const height = canvas.height;
+                ctx.clearRect(0, 0, width, height);
+
+                // Waveform
+                analyserLocal.getByteTimeDomainData(dataWaveRef.current);
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = "#00ff99";
+                ctx.beginPath();
+                const slice = width / dataWaveRef.current.length;
+                let x = 0;
+                for (let i = 0; i < dataWaveRef.current.length; i++) {
+                  const v = dataWaveRef.current[i] / 128.0;
+                  const y = (v * height) / 2;
+                  if (i === 0) ctx.moveTo(x, y);
+                  else ctx.lineTo(x, y);
+                  x += slice;
+                }
+                ctx.stroke();
+
+                // Spectrum (salteando barras para menos carga)
+                analyserLocal.getByteFrequencyData(dataFreqRef.current);
+                const barWidth = 3;
+                for (let i = 0; i < dataFreqRef.current.length; i += 4) {
+                  const barHeight = (dataFreqRef.current[i] / 255) * height;
+                  ctx.fillStyle = "rgba(0,200,255,0.6)";
+                  ctx.fillRect(
+                    (i / 4) * barWidth,
+                    height - barHeight,
+                    barWidth,
+                    barHeight
+                  );
+                }
+
+                animRef.current = requestAnimationFrame(draw);
+              };
+
+              animRef.current = requestAnimationFrame(draw);
+              console.log("🔎 Visualizer Listener iniciado");
+            }
+          } catch (err) {
+            console.warn("⚠️ Error iniciando visualizer (listener):", err);
+          }
         }
       };
 
@@ -102,8 +175,13 @@ function Listener({ signalingServer }) {
       signalingServer.addEventListener("open", requestOffer, { once: true });
     }
 
+    // === Cleanup al desmontar ===
     return () => {
       if (peerRef.current) peerRef.current.close();
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+        audioCtxRef.current.close().catch(() => {});
+      }
     };
   }, [signalingServer]);
 
@@ -112,6 +190,18 @@ function Listener({ signalingServer }) {
       <h2>Oyente</h2>
       {!connected && <p>Esperando transmisión...</p>}
       <audio ref={audioRef} autoPlay controls />
+      <canvas
+        ref={canvasRef}
+        width={320}
+        height={100}
+        style={{
+          border: "1px solid #333",
+          marginTop: "10px",
+          borderRadius: "10px",
+          width: "100%",
+          maxWidth: "400px",
+        }}
+      />
     </div>
   );
 }
