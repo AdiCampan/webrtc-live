@@ -13,8 +13,10 @@ function App() {
     // Detecta automáticamente el protocolo y host actuales (para Render o localhost)
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const host = window.location.host;
-    // const signalingServer = new WebSocket(`${protocol}://${host}`);
-    const signalingServer = new WebSocket("ws://localhost:8080");
+    //para rular en internet
+    const signalingServer = new WebSocket(`${protocol}://${host}`);
+    // parapruebas locales
+    // const signalingServer = new WebSocket("ws://localhost:8080");
 
     signalingServer.onopen = () => {
       console.log("✅ Conectado al servidor de señalización");
