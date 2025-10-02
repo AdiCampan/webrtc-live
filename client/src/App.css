@@ -116,8 +116,9 @@ audio {
 
 .language-buttons {
   display: flex;
+  flex-wrap: wrap; /* permite que se muevan a la siguiente línea en móviles */
   justify-content: center;
-  gap: 20px;
+  gap: 15px;
   margin-top: 20px;
 }
 
@@ -170,4 +171,11 @@ audio {
     #ff0000 70%,
     /* Rojo */ #ff0000 100%
   );
+}
+@media (max-width: 480px) {
+  .btn-language {
+    width: 100px; /* más pequeño para pantallas pequeñas */
+    height: 100px;
+    font-size: 1.2rem;
+  }
 }
