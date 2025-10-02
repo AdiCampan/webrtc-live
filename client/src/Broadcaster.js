@@ -27,7 +27,7 @@ const rtcConfig = {
   ],
 };
 
-function Broadcaster({ signalingServer }) {
+function Broadcaster({ signalingServer, language }) {
   const peers = useRef({});
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
@@ -209,8 +209,8 @@ function Broadcaster({ signalingServer }) {
     }
 
     if (signalingServer.readyState === WebSocket.OPEN) {
-      signalingServer.send(JSON.stringify({ type: "broadcaster" }));
-      console.log("📤 Registrado como Broadcaster");
+      signalingServer.send(JSON.stringify({ type: "broadcaster", language }));
+      console.log(`📤 Registrado como Broadcaster (${language})`);
     } else {
       console.error("❌ WebSocket no abierto");
     }

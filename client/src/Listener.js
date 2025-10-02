@@ -26,7 +26,7 @@ const rtcConfig = {
   ],
 };
 
-function Listener({ signalingServer }) {
+function Listener({ signalingServer, language }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
   const [connected, setConnected] = useState(false);
@@ -165,8 +165,8 @@ function Listener({ signalingServer }) {
     };
 
     const requestOffer = () => {
-      signalingServer.send(JSON.stringify({ type: "request-offer" }));
-      console.log("📡 Listener solicitó oferta");
+      signalingServer.send(JSON.stringify({ type: "request-offer", language }));
+      console.log("📡 Listener solicitó oferta para idioma", language);
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {
