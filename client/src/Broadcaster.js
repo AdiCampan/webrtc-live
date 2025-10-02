@@ -247,9 +247,9 @@ function Broadcaster({ signalingServer, language, setRole }) {
     <div className="broadcaster-container">
       <div className="broadcaster-language">
         🚀 Emitir en{" "}
-        {language === "espanol"
+        {language === "es"
           ? "Español"
-          : language === "ingles"
+          : language === "en"
           ? "Inglés"
           : "Rumano"}
       </div>

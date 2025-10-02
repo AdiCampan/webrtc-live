@@ -66,3 +66,15 @@ canvas {
     height: 120px !important;
   }
 }
+.mic-selector {
+  margin-bottom: 1rem;
+  color: #fff;
+}
+
+.mic-selector select {
+  margin-left: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: none;
+  font-size: 1rem;
+}

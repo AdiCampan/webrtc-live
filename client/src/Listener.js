@@ -190,9 +190,9 @@ function Listener({ signalingServer, language, setRole }) {
       <h2>Oyente</h2>
       <h3>
         🎧 Audio en{" "}
-        {language === "espanol"
+        {language === "es"
           ? "Español"
-          : language === "ingles"
+          : language === "en"
           ? "Inglés"
           : "Rumano"}
       </h3>
