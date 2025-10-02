@@ -31,6 +31,16 @@ function Broadcaster({ signalingServer, language, setRole }) {
   const peers = useRef({});
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+
+  useEffect(() => {
+    navigator.mediaDevices.enumerateDevices().then((devices) => {
+      const mics = devices.filter((d) => d.kind === "audioinput");
+      setAudioDevices(mics);
+      if (mics.length > 0) setSelectedDeviceId(mics[0].deviceId); // seleccionar el primero por defecto
+    });
+  }, []);
 
   // Visualizador
   const canvasRef = useRef(null);
@@ -135,8 +145,13 @@ function Broadcaster({ signalingServer, language, setRole }) {
       try {
         console.log("🎙️ Solicitando micrófono...");
         streamRef.current = await navigator.mediaDevices.getUserMedia({
-          audio: true,
+          audio: {
+            deviceId: selectedDeviceId
+              ? { exact: selectedDeviceId }
+              : undefined,
+          },
         });
+
         console.log("✅ Micrófono listo");
 
         // === Configurar visualizador ===
@@ -238,6 +253,20 @@ function Broadcaster({ signalingServer, language, setRole }) {
           ? "Inglés"
           : "Rumano"}
       </div>
+      <div className="mic-selector">
+        <label>🎤 Seleccionar micrófono:</label>
+        <select
+          value={selectedDeviceId || ""}
+          onChange={(e) => setSelectedDeviceId(e.target.value)}
+        >
+          {audioDevices.map((device) => (
+            <option key={device.deviceId} value={device.deviceId}>
+              {device.label || `Micrófono ${device.deviceId}`}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <button
         onClick={startBroadcast}
         disabled={broadcasting}
