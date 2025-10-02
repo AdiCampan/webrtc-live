@@ -26,7 +26,7 @@ const rtcConfig = {
   ],
 };
 
-function Listener({ signalingServer, language }) {
+function Listener({ signalingServer, language, setRole }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
   const [connected, setConnected] = useState(false);

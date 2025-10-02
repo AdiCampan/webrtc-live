@@ -27,7 +27,7 @@ const rtcConfig = {
   ],
 };
 
-function Broadcaster({ signalingServer, language }) {
+function Broadcaster({ signalingServer, language, setRole }) {
   const peers = useRef({});
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
