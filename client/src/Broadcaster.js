@@ -230,6 +230,14 @@ function Broadcaster({ signalingServer, language, setRole }) {
 
   return (
     <div className="broadcaster-container">
+      <div className="broadcaster-language">
+        🚀 Emitir en{" "}
+        {language === "espanol"
+          ? "Español"
+          : language === "ingles"
+          ? "Inglés"
+          : "Rumano"}
+      </div>
       <button
         onClick={startBroadcast}
         disabled={broadcasting}

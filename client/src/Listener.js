@@ -188,6 +188,15 @@ function Listener({ signalingServer, language, setRole }) {
   return (
     <div>
       <h2>Oyente</h2>
+      <h3>
+        🎧 Audio en{" "}
+        {language === "espanol"
+          ? "Español"
+          : language === "ingles"
+          ? "Inglés"
+          : "Rumano"}
+      </h3>
+
       {!connected && <p>Esperando transmisión...</p>}
       <audio ref={audioRef} autoPlay controls />
       <button
