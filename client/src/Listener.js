@@ -190,6 +190,28 @@ function Listener({ signalingServer, language }) {
       <h2>Oyente</h2>
       {!connected && <p>Esperando transmisión...</p>}
       <audio ref={audioRef} autoPlay controls />
+      <button
+        onClick={() => {
+          // Cerrar PeerConnection
+          if (peerRef.current) peerRef.current.close();
+          peerRef.current = null;
+
+          // Detener visualizador y audio
+          if (animRef.current) cancelAnimationFrame(animRef.current);
+          if (audioRef.current) audioRef.current.srcObject = null;
+          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+            audioCtxRef.current.close().catch(() => {});
+            audioCtxRef.current = null;
+          }
+
+          // Regresar a pantalla Home
+          if (typeof setRole === "function") setRole(null);
+        }}
+        className="btn-back"
+      >
+        🔙 Volver
+      </button>
+
       <canvas
         ref={canvasRef}
         width={320}

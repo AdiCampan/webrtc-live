@@ -84,10 +84,18 @@ function App() {
         )}
 
         {role?.role === "broadcaster" && (
-          <Broadcaster signalingServer={ws} language={role.language} />
+          <Broadcaster
+            signalingServer={ws}
+            language={role.language}
+            setRole={setRole}
+          />
         )}
         {role?.role === "listener" && (
-          <Listener signalingServer={ws} language={role.language} />
+          <Listener
+            signalingServer={ws}
+            language={role.language}
+            setRole={setRole}
+          />
         )}
       </div>
     </div>

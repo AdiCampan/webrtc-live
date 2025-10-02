@@ -241,6 +241,32 @@ function Broadcaster({ signalingServer, language }) {
       {broadcasting && (
         <>
           <div className="broadcasting-text">Tu transmisión está activa</div>
+          <button
+            onClick={() => {
+              // Detener transmisión
+              if (streamRef.current) {
+                streamRef.current.getTracks().forEach((track) => track.stop());
+                streamRef.current = null;
+              }
+
+              // Detener visualizador
+              if (animRef.current) cancelAnimationFrame(animRef.current);
+              if (
+                audioCtxRef.current &&
+                audioCtxRef.current.state !== "closed"
+              ) {
+                audioCtxRef.current.close().catch(() => {});
+                audioCtxRef.current = null;
+              }
+
+              // Regresar a pantalla Home
+              if (typeof setRole === "function") setRole(null);
+            }}
+            className="btn-stop"
+          >
+            🛑 Parar Transmisión
+          </button>
+
           <canvas
             ref={canvasRef}
             width={600}

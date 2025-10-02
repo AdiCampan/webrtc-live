@@ -43,3 +43,20 @@
     font-size: 1.25rem;
   }
 }
+
+@media (max-width: 480px) {
+  .listener-card {
+    width: 95%;
+    padding: 1rem;
+  }
+
+  .listener-card audio {
+    width: 100%;
+    height: 50px; /* un tamaño cómodo */
+  }
+
+  canvas {
+    width: 100% !important; /* visualizador de audio ajustable */
+    height: 80px !important;
+  }
+}
