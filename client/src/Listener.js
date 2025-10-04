@@ -28,8 +28,8 @@ const rtcConfig = {
 
 function Listener({ signalingServer, language, setRole }) {
   const peerRef = useRef(null);
+  const broadcasterIdRef = useRef(null); // 🔑 guardamos el ID del broadcaster
   const audioRef = useRef(null);
-  const broadcasterIdRef = useRef(null); // 🔑 Guardar el Broadcaster asignado
   const [connected, setConnected] = useState(false);
 
   const canvasRef = useRef(null);
@@ -144,7 +144,7 @@ function Listener({ signalingServer, language, setRole }) {
       };
 
       peer.onicecandidate = (event) => {
-        if (event.candidate && broadcasterIdRef.current) {
+        if (event.candidate) {
           signalingServer.send(
             JSON.stringify({
               type: "candidate",
@@ -164,18 +164,17 @@ function Listener({ signalingServer, language, setRole }) {
       console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
-        broadcasterIdRef.current = data.clientId; // 🔑 Guardamos el ID del Broadcaster
-        if (peerRef.current) peerRef.current.close();
+        if (peerRef.current) {
+          peerRef.current.close();
+          peerRef.current = null;
+        }
+        broadcasterIdRef.current = data.clientId; // 🔑 guardar broadcasterId
         const peer = createPeer();
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
         signalingServer.send(
-          JSON.stringify({
-            type: "answer",
-            answer,
-            target: broadcasterIdRef.current,
-          })
+          JSON.stringify({ type: "answer", answer, target: data.clientId })
         );
         console.log("📤 Listener envió answer");
       }
@@ -209,10 +208,18 @@ function Listener({ signalingServer, language, setRole }) {
     // Cleanup
     return () => {
       signalingServer.removeEventListener("message", handleMessage);
-      if (peerRef.current) peerRef.current.close();
+      if (peerRef.current) {
+        peerRef.current.close();
+        peerRef.current = null;
+      }
+      broadcasterIdRef.current = null; // 🔑 reset broadcaster al salir
+      setConnected(false);
       if (animRef.current) cancelAnimationFrame(animRef.current);
-      if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
+      if (audioRef.current) audioRef.current.srcObject = null;
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
         audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
     };
   }, [signalingServer, language]);
 
@@ -233,15 +240,18 @@ function Listener({ signalingServer, language, setRole }) {
 
       <button
         onClick={() => {
-          if (peerRef.current) peerRef.current.close();
-          peerRef.current = null;
+          if (peerRef.current) {
+            peerRef.current.close();
+            peerRef.current = null;
+          }
+          broadcasterIdRef.current = null; // 🔑 reset también en el botón
+          setConnected(false);
           if (animRef.current) cancelAnimationFrame(animRef.current);
           if (audioRef.current) audioRef.current.srcObject = null;
-          if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
-            audioCtxRef.current.close().catch(() => {
-              audioCtxRef.current = null;
-            });
-          broadcasterIdRef.current = null;
+          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+            audioCtxRef.current.close().catch(() => {});
+            audioCtxRef.current = null;
+          }
           if (typeof setRole === "function") setRole(null);
         }}
       >
