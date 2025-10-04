@@ -38,7 +38,7 @@ function Broadcaster({ signalingServer, language, setRole }) {
     navigator.mediaDevices.enumerateDevices().then((devices) => {
       const mics = devices.filter((d) => d.kind === "audioinput");
       setAudioDevices(mics);
-      if (mics.length > 0) setSelectedDeviceId(mics[0].deviceId); // seleccionar el primero por defecto
+      if (mics.length > 0) setSelectedDeviceId(mics[0].deviceId);
     });
   }, []);
 
@@ -104,10 +104,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
     const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
 
-    // peer.oniceconnectionstatechange = () => {
-    //   console.log(`🔄 ICE state con ${clientId}:`, peer.iceConnectionState);
-    // };
-    // Nuevo: estado ICE y reconexión automática
     peer.oniceconnectionstatechange = async () => {
       const state = peer.iceConnectionState;
       console.log(`🔄 ICE state con ${clientId}:`, state);
@@ -119,13 +115,13 @@ function Broadcaster({ signalingServer, language, setRole }) {
           const offer = await peer.createOffer({ iceRestart: true });
           await peer.setLocalDescription(offer);
           signalingServer.send(
-            JSON.stringify({ type: "offer", offer, target: clientId, language })
+            JSON.stringify({ type: "offer", offer, target: clientId })
           );
           console.log("🔁 ICE reiniciado con éxito en", clientId);
         } catch (err) {
           console.error("❌ restartIce falló, recreando Peer:", err);
           delete peers.current[clientId];
-          await createPeer(clientId); // reintenta recrear el peer completo
+          await createPeer(clientId);
         }
       }
     };
@@ -136,13 +132,11 @@ function Broadcaster({ signalingServer, language, setRole }) {
 
     peer.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("📤 Enviando candidate a", clientId);
         signalingServer.send(
           JSON.stringify({
             type: "candidate",
             candidate: event.candidate,
             target: clientId,
-            language,
           })
         );
       }
@@ -151,9 +145,8 @@ function Broadcaster({ signalingServer, language, setRole }) {
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      console.log("📤 Enviando offer a", clientId);
       signalingServer.send(
-        JSON.stringify({ type: "offer", offer, target: clientId, language })
+        JSON.stringify({ type: "offer", offer, target: clientId })
       );
     } catch (err) {
       console.error("❌ Error creando oferta:", err);
@@ -162,11 +155,8 @@ function Broadcaster({ signalingServer, language, setRole }) {
 
   // Iniciar transmisión
   const startBroadcast = async () => {
-    console.log("🟢 CLICK en Iniciar Transmisión");
-
     if (!streamRef.current) {
       try {
-        console.log("🎙️ Solicitando micrófono...");
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: {
             deviceId: selectedDeviceId
@@ -175,15 +165,13 @@ function Broadcaster({ signalingServer, language, setRole }) {
           },
         });
 
-        console.log("✅ Micrófono listo");
-
-        // === Configurar visualizador ===
+        // === Visualizador ===
         if (!audioCtxRef.current) {
           const AudioCtx = window.AudioContext || window.webkitAudioContext;
           audioCtxRef.current = new AudioCtx();
 
           const analyser = audioCtxRef.current.createAnalyser();
-          analyser.fftSize = 1024; // menor carga para móviles
+          analyser.fftSize = 1024;
           analyserRef.current = analyser;
 
           const src = audioCtxRef.current.createMediaStreamSource(
@@ -204,7 +192,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
             const height = canvas.height;
             ctx.clearRect(0, 0, width, height);
 
-            // Waveform
             analyserLocal.getByteTimeDomainData(dataWaveRef.current);
             ctx.lineWidth = 2;
             ctx.strokeStyle = "lime";
@@ -220,7 +207,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
             }
             ctx.stroke();
 
-            // Spectrum
             analyserLocal.getByteFrequencyData(dataFreqRef.current);
             const barWidth = Math.max(1, width / dataFreqRef.current.length);
             for (let i = 0; i < dataFreqRef.current.length; i++) {
@@ -238,7 +224,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
           };
 
           animRef.current = requestAnimationFrame(draw);
-          console.log("🔎 Visualizer Broadcaster iniciado");
         }
       } catch (err) {
         console.error("❌ Error accediendo micrófono:", err);
@@ -248,9 +233,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
 
     if (signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(JSON.stringify({ type: "broadcaster", language }));
-      console.log(`📤 Registrado como Broadcaster (${language})`);
-    } else {
-      console.error("❌ WebSocket no abierto");
     }
 
     setBroadcasting(true);
@@ -303,13 +285,10 @@ function Broadcaster({ signalingServer, language, setRole }) {
           <div className="broadcasting-text">Tu transmisión está activa</div>
           <button
             onClick={() => {
-              // Detener transmisión
-              if (streamRef.current) {
-                streamRef.current.getTracks().forEach((track) => track.stop());
-                streamRef.current = null;
-              }
+              if (streamRef.current)
+                streamRef.current.getTracks().forEach((t) => t.stop());
+              streamRef.current = null;
 
-              // Detener visualizador
               if (animRef.current) cancelAnimationFrame(animRef.current);
               if (
                 audioCtxRef.current &&
@@ -319,7 +298,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
                 audioCtxRef.current = null;
               }
 
-              // Regresar a pantalla Home
               if (typeof setRole === "function") setRole(null);
             }}
             className="btn-stop"

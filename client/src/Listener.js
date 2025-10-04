@@ -30,6 +30,7 @@ function Listener({ signalingServer, language, setRole }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
   const [connected, setConnected] = useState(false);
+
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
@@ -38,13 +39,14 @@ function Listener({ signalingServer, language, setRole }) {
   const animRef = useRef(null);
 
   useEffect(() => {
+    // Crear PeerConnection
     const createPeer = () => {
       const peer = new RTCPeerConnection(rtcConfig);
       peerRef.current = peer;
 
       peer.oniceconnectionstatechange = async () => {
         const state = peer.iceConnectionState;
-        console.log(`🔄 ICE state Listener:`, state);
+        console.log("🔄 ICE state Listener:", state);
 
         if (state === "failed" || state === "disconnected") {
           console.warn("⚠️ ICE falló, intentando restartIce...");
@@ -52,9 +54,9 @@ function Listener({ signalingServer, language, setRole }) {
             await peer.restartIce();
             const offer = await peer.createOffer({ iceRestart: true });
             await peer.setLocalDescription(offer);
-            signalingServer.send(
-              JSON.stringify({ type: "offer", offer, language })
-            );
+
+            // ⚠️ No enviamos language aquí, el servidor conoce el idioma
+            signalingServer.send(JSON.stringify({ type: "offer", offer }));
             console.log("🔁 ICE reiniciado con éxito");
           } catch (err) {
             console.error("❌ restartIce falló:", err);
@@ -68,7 +70,7 @@ function Listener({ signalingServer, language, setRole }) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
 
-          // === Visualizer setup ===
+          // === Visualizador ===
           try {
             if (!audioCtxRef.current) {
               const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -140,13 +142,9 @@ function Listener({ signalingServer, language, setRole }) {
 
       peer.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log("📤 Listener enviando candidate");
+          // ⚠️ No enviamos language aquí
           signalingServer.send(
-            JSON.stringify({
-              type: "candidate",
-              candidate: event.candidate,
-              language,
-            })
+            JSON.stringify({ type: "candidate", candidate: event.candidate })
           );
         }
       };
@@ -154,24 +152,19 @@ function Listener({ signalingServer, language, setRole }) {
       return peer;
     };
 
+    // Manejar mensajes del servidor
     signalingServer.onmessage = async (event) => {
       const data = JSON.parse(event.data);
       console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
-        if (peerRef.current) {
-          try {
-            peerRef.current.close();
-          } catch {}
-        }
+        if (peerRef.current) peerRef.current.close();
         const peer = createPeer();
 
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        signalingServer.send(
-          JSON.stringify({ type: "answer", answer, language })
-        );
+        signalingServer.send(JSON.stringify({ type: "answer", answer }));
         console.log("📤 Listener envió answer");
       }
 
@@ -181,12 +174,13 @@ function Listener({ signalingServer, language, setRole }) {
             new RTCIceCandidate(data.candidate)
           );
           console.log("✅ Candidate agregado en Listener");
-        } catch (e) {
-          console.error("❌ Error agregando candidate en Listener", e);
+        } catch (err) {
+          console.error("❌ Error agregando candidate:", err);
         }
       }
     };
 
+    // Solicitar oferta del Broadcaster
     const requestOffer = () => {
       signalingServer.send(JSON.stringify({ type: "request-offer", language }));
       console.log("📡 Listener solicitó oferta para idioma", language);
