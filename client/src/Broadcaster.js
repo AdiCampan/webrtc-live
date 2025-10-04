@@ -61,6 +61,11 @@ function Broadcaster({ signalingServer, language, setRole }) {
           console.warn("⚠️ No hay stream activo, no se puede crear Peer");
           return;
         }
+        // Elimina Peer antiguo si existe para el mismo clientId
+        if (peers.current[data.clientId]) {
+          peers.current[data.clientId].close();
+          delete peers.current[data.clientId];
+        }
         await createPeer(data.clientId);
       }
 
@@ -97,34 +102,16 @@ function Broadcaster({ signalingServer, language, setRole }) {
 
   // Crear PeerConnection para cada Listener
   const createPeer = async (clientId) => {
-    if (peers.current[clientId]) return;
-
     console.log("🆕 Creando PeerConnection para", clientId);
     const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
 
-    // Asegurar que el stream exista
-    if (!streamRef.current) {
-      try {
-        streamRef.current = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            deviceId: selectedDeviceId
-              ? { exact: selectedDeviceId }
-              : undefined,
-          },
-        });
-      } catch (err) {
-        console.error("❌ No se pudo acceder al micrófono:", err);
-        return;
-      }
-    }
-
-    // Agregar tracks activas
-    streamRef.current.getTracks().forEach((track) => {
-      if (track.readyState === "live") {
+    // Agregar pistas de audio
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
         peer.addTrack(track, streamRef.current);
-      }
-    });
+      });
+    }
 
     // ICE reconexión
     peer.oniceconnectionstatechange = async () => {
@@ -179,11 +166,9 @@ function Broadcaster({ signalingServer, language, setRole }) {
     if (!streamRef.current) {
       try {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            deviceId: selectedDeviceId
-              ? { exact: selectedDeviceId }
-              : undefined,
-          },
+          audio: selectedDeviceId
+            ? { deviceId: { exact: selectedDeviceId } }
+            : true,
         });
 
         // Configurar visualizador
@@ -261,7 +246,10 @@ function Broadcaster({ signalingServer, language, setRole }) {
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
       }
+      Object.values(peers.current).forEach((p) => p.close());
+      peers.current = {};
     };
   }, []);
 
@@ -290,8 +278,7 @@ function Broadcaster({ signalingServer, language, setRole }) {
       </div>
 
       <button onClick={startBroadcast} disabled={broadcasting}>
-        {" "}
-        {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}{" "}
+        {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
       </button>
 
       {broadcasting && (
@@ -301,11 +288,14 @@ function Broadcaster({ signalingServer, language, setRole }) {
               if (streamRef.current)
                 streamRef.current.getTracks().forEach((t) => t.stop());
               streamRef.current = null;
+
               Object.values(peers.current).forEach((p) => p.close());
               peers.current = {};
+
               if (animRef.current) cancelAnimationFrame(animRef.current);
               if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
                 audioCtxRef.current.close().catch(() => {});
+
               setBroadcasting(false);
               if (typeof setRole === "function") setRole(null);
             }}
