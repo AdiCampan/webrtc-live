@@ -79,25 +79,30 @@ wss.on("connection", (ws) => {
       // ==========================
       // Reenvío estricto de mensajes (offer, answer, candidate)
       // ==========================
+      // Reenvío estricto entre broadcaster y listener del mismo idioma
       if (["offer", "answer", "candidate"].includes(data.type)) {
-        if (!data.language) {
-          console.warn("⚠️ Mensaje sin language, ignorado:", data);
+        // Obtenemos el targetClient
+        const targetClient = [...wss.clients].find(
+          (client) => client.id === data.target
+        );
+        if (!targetClient || targetClient.readyState !== ws.OPEN) {
+          console.warn(`⚠️ Target no disponible para ${data.type}`);
           return;
         }
 
-        const targetClient = [...wss.clients].find(
-          (client) =>
-            client.id === data.target && client.language === data.language
-        );
-
-        if (targetClient && targetClient.readyState === ws.OPEN) {
+        // Validar que ambos (ws y target) tengan mismo idioma
+        if (
+          ws.language &&
+          targetClient.language &&
+          ws.language === targetClient.language
+        ) {
           targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
           console.log(
-            `➡️ ${data.type} (${data.language}) reenviado de ${ws.id} a ${data.target}`
+            `➡️ ${data.type} (${ws.language}) reenviado de ${ws.id} a ${data.target}`
           );
         } else {
           console.warn(
-            `⚠️ Target no disponible para ${data.type} (${data.language})`
+            `⚠️ Idioma no coincide entre ${ws.id} y ${data.target}, mensaje ignorado`
           );
         }
         return;
