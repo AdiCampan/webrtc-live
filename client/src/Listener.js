@@ -225,7 +225,6 @@ function Listener({ signalingServer, language, setRole }) {
 
   return (
     <div>
-      <h2>Oyente</h2>
       <h3>
         🎧 Audio en{" "}
         {language === "es"
@@ -260,11 +259,11 @@ function Listener({ signalingServer, language, setRole }) {
 
       <canvas
         ref={canvasRef}
-        width={320}
+        width={300}
         height={100}
         style={{
           border: "1px solid #333",
-          marginTop: "10px",
+          margin: "10px",
           borderRadius: "10px",
           width: "100%",
           maxWidth: "400px",

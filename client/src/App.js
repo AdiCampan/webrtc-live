@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Broadcaster from "./Broadcaster";
 import Listener from "./Listener";
 import "./App.css";
-
+import Countdown from "./Countdown";
 /*
   App.js con:
     - reconexión automática WebSocket (backoff exponencial)
@@ -13,6 +13,7 @@ import "./App.css";
 */
 
 function App() {
+  const nextEvent = "2025-10-05T01:45:00";
   // ws guarda la instancia actual de WebSocket que pasamos a los componentes.
   const [ws, setWs] = useState(null);
 
@@ -30,6 +31,8 @@ function App() {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     return `${protocol}://${window.location.host}`;
   })();
+
+  // const signalingUrl = "ws://localhost:8080"; // para pruebas locales
 
   // ------ FUNCIONES DE CONEXIÓN Y RECONEXIÓN ------
   // createWebSocket: crea el WebSocket y monta handlers básicos.
@@ -172,58 +175,72 @@ function App() {
   return (
     <div className="App">
       <div className="app-container">
-        <h1>🎙️ Traducción en Vivo</h1>
+        <h1 style={{ margin: "20px" }}>TRADUCCIÓN EN VIVO</h1>
 
         {!role && (
           <div className="flex flex-col gap-6 w-full">
             {/* Sección transmisores */}
-            <div className="flex flex-col items-center gap-3">
-              <h2>🎙️ Iniciar como Transmisor</h2>
-              <button
-                onClick={() => setRole({ role: "broadcaster", language: "es" })}
-                className="btn-broadcaster"
-              >
-                🚀 Emitir en Español
-              </button>
-              <button
-                onClick={() => setRole({ role: "broadcaster", language: "en" })}
-                className="btn-broadcaster"
-              >
-                🚀 Emitir en Inglés
-              </button>
-              <button
-                onClick={() => setRole({ role: "broadcaster", language: "ro" })}
-                className="btn-broadcaster"
-              >
-                🚀 Emitir en Rumano
-              </button>
+            <div className="broadcaster-section">
+              <h2>🎙️ Emitir transmisión</h2>
+              <div className="broadcasters-container">
+                <button
+                  onClick={() =>
+                    setRole({ role: "broadcaster", language: "es" })
+                  }
+                  className="btn-broadcaster"
+                >
+                  🎙️ Español
+                </button>
+                <button
+                  onClick={() =>
+                    setRole({ role: "broadcaster", language: "en" })
+                  }
+                  className="btn-broadcaster"
+                >
+                  🎙️ Inglés
+                </button>
+                <button
+                  onClick={() =>
+                    setRole({ role: "broadcaster", language: "ro" })
+                  }
+                  className="btn-broadcaster"
+                >
+                  🎙️ Rumano
+                </button>
+              </div>
+
+              {/* Caja de texto informativo */}
+            </div>
+            <div>
+              <div className="info-box">
+                <p>
+                  ℹ️ Bienvenidos a la sección de audio de la Iglesia EBEN-EZER
+                  de Castellón de la Plana. Aquí pueden escuchar el programa de
+                  audio en el idioma que prefieran, todos los domingos de 10:00
+                  a 12:00 y de 18:00 a 20:00.
+                </p>
+              </div>
             </div>
 
-            {/* Sección oyentes */}
+            {/* Botones oyentes */}
             <div className="language-buttons">
               <button
                 className="btn-language espanol"
                 onClick={() => setRole({ role: "listener", language: "es" })}
-              >
-                🇪🇸
-              </button>
+              />
               <button
                 className="btn-language ingles"
                 onClick={() => setRole({ role: "listener", language: "en" })}
-              >
-                🇬🇧
-              </button>
+              />
               <button
                 className="btn-language rumano"
                 onClick={() => setRole({ role: "listener", language: "ro" })}
-              >
-                🇷🇴
-              </button>
+              />
             </div>
           </div>
         )}
 
-        {/* Pasamos setRole para que Broadcaster/Listener puedan volver al home */}
+        {/* Pasamos setRole */}
         {role?.role === "broadcaster" && (
           <Broadcaster
             signalingServer={ws}
@@ -239,6 +256,12 @@ function App() {
           />
         )}
       </div>
+      <Countdown targetDate={nextEvent} />
+
+      {/* Footer */}
+      <footer className="footer">
+        <p>© EBEN-EZER Media 2025</p>
+      </footer>
     </div>
   );
 }
