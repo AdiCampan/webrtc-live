@@ -41,7 +41,9 @@ wss.on("connection", (ws) => {
       const data = JSON.parse(msg.toString());
       console.log(`📩 Mensaje recibido de ${ws.id}:`, data);
 
+      // ==========================
       // Registrar Broadcaster
+      // ==========================
       if (data.type === "broadcaster" && data.language) {
         ws.isBroadcaster = true;
         ws.language = data.language;
@@ -52,8 +54,12 @@ wss.on("connection", (ws) => {
         return;
       }
 
+      // ==========================
       // Listener solicita oferta de un idioma
+      // ==========================
       if (data.type === "request-offer" && data.language) {
+        ws.language = data.language; // Guardamos idioma del listener
+
         const targetBroadcaster = broadcasters[data.language];
         if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
           targetBroadcaster.send(
@@ -62,51 +68,36 @@ wss.on("connection", (ws) => {
           console.log(
             `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
           );
-        }
-        return;
-      }
-
-      // Reenviar mensajes a target específico
-      if (data.target) {
-        const targetClient = [...wss.clients].find(
-          (client) => client.id === data.target
-        );
-        if (targetClient && targetClient.readyState === ws.OPEN) {
-          targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
-          console.log(`➡️ Mensaje enviado a ${data.target} desde ${ws.id}`);
-        }
-        return;
-      }
-
-      // Listener solicita oferta de un idioma
-      if (data.type === "request-offer" && data.language) {
-        ws.language = data.language; // guardamos idioma del listener
-        const targetBroadcaster = broadcasters[data.language];
-        if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
-          targetBroadcaster.send(
-            JSON.stringify({ type: "request-offer", clientId: ws.id })
-          );
-          console.log(
-            `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
+        } else {
+          console.warn(
+            `⚠️ No hay Broadcaster activo para idioma ${data.language}`
           );
         }
         return;
       }
 
-      // Reenvío estricto entre broadcaster y listener del mismo idioma
+      // ==========================
+      // Reenvío estricto de mensajes (offer, answer, candidate)
+      // ==========================
       if (["offer", "answer", "candidate"].includes(data.type)) {
         if (!data.language) {
           console.warn("⚠️ Mensaje sin language, ignorado:", data);
           return;
         }
+
         const targetClient = [...wss.clients].find(
           (client) =>
             client.id === data.target && client.language === data.language
         );
+
         if (targetClient && targetClient.readyState === ws.OPEN) {
           targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
           console.log(
             `➡️ ${data.type} (${data.language}) reenviado de ${ws.id} a ${data.target}`
+          );
+        } else {
+          console.warn(
+            `⚠️ Target no disponible para ${data.type} (${data.language})`
           );
         }
         return;
@@ -119,7 +110,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
     if (ws.isBroadcaster && ws.language) {
-      broadcasters[ws.language] = null;
+      delete broadcasters[ws.language]; // Eliminamos broadcaster desconectado
       console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
     }
   });
