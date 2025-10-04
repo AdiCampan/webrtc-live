@@ -26,8 +26,6 @@ const rtcConfig = {
   ],
 };
 
-import { useEffect, useRef, useState } from "react";
-
 function Listener({ signalingServer, language, setRole }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
