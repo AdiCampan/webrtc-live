@@ -119,7 +119,7 @@ function Broadcaster({ signalingServer, language, setRole }) {
           const offer = await peer.createOffer({ iceRestart: true });
           await peer.setLocalDescription(offer);
           signalingServer.send(
-            JSON.stringify({ type: "offer", offer, target: clientId })
+            JSON.stringify({ type: "offer", offer, target: clientId, language })
           );
           console.log("🔁 ICE reiniciado con éxito en", clientId);
         } catch (err) {
@@ -142,6 +142,7 @@ function Broadcaster({ signalingServer, language, setRole }) {
             type: "candidate",
             candidate: event.candidate,
             target: clientId,
+            language,
           })
         );
       }
@@ -152,7 +153,7 @@ function Broadcaster({ signalingServer, language, setRole }) {
       await peer.setLocalDescription(offer);
       console.log("📤 Enviando offer a", clientId);
       signalingServer.send(
-        JSON.stringify({ type: "offer", offer, target: clientId })
+        JSON.stringify({ type: "offer", offer, target: clientId, language })
       );
     } catch (err) {
       console.error("❌ Error creando oferta:", err);

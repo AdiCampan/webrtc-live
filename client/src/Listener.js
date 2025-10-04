@@ -142,7 +142,11 @@ function Listener({ signalingServer, language, setRole }) {
         if (event.candidate) {
           console.log("📤 Listener enviando candidate");
           signalingServer.send(
-            JSON.stringify({ type: "candidate", candidate: event.candidate })
+            JSON.stringify({
+              type: "candidate",
+              candidate: event.candidate,
+              language,
+            })
           );
         }
       };
@@ -165,7 +169,9 @@ function Listener({ signalingServer, language, setRole }) {
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        signalingServer.send(JSON.stringify({ type: "answer", answer }));
+        signalingServer.send(
+          JSON.stringify({ type: "answer", answer, language })
+        );
         console.log("📤 Listener envió answer");
       }
 
