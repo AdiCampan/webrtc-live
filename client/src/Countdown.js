@@ -1,6 +1,6 @@
 // Countdown.js
-import React, { useState, useEffect, useRef } from "react";
-import "./App.css"; // o Countdown.css
+import React, { useState, useEffect } from "react";
+import "./App.css"; // o un CSS específico si prefieres
 
 const Countdown = ({ targetDate }) => {
   const calculateTimeLeft = () => {
@@ -17,13 +17,7 @@ const Countdown = ({ targetDate }) => {
 
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
   const [reminderSet, setReminderSet] = useState(false);
-  const [visible, setVisible] = useState(true);
-
-  // Para drag & drop
-  const widgetRef = useRef(null);
-  const [dragging, setDragging] = useState(false);
-  const [position, setPosition] = useState({ x: 20, y: 20 });
-  const dragOffset = useRef({ x: 0, y: 0 });
+  const [visible, setVisible] = useState(true); // controla si se muestra
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -51,14 +45,14 @@ const Countdown = ({ targetDate }) => {
             {
               body: "La emisión inicia pronto 🚀",
               icon: "/favicon.ico",
-              requireInteraction: true,
+              requireInteraction: true, // no desaparece sola
             }
           );
 
           notification.onclick = (event) => {
             event.preventDefault();
             window.focus();
-            window.open("/", "_blank");
+            window.open("/", "_blank"); // abre tu app
           };
         };
 
@@ -71,71 +65,43 @@ const Countdown = ({ targetDate }) => {
     });
   };
 
-  if (!visible) return null;
+  if (!visible) return null; // no renderiza si está cerrado
 
-  // Drag & Drop handlers
-  const handleMouseDown = (e) => {
-    setDragging(true);
-    dragOffset.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    };
-  };
-
-  const handleMouseMove = (e) => {
-    if (!dragging) return;
-    setPosition({
-      x: e.clientX - dragOffset.current.x,
-      y: e.clientY - dragOffset.current.y,
-    });
-  };
-
-  const handleMouseUp = () => {
-    setDragging(false);
-  };
+  if (!timeLeft) {
+    return (
+      <div className="countdown-box">
+        <button className="close-btn" onClick={() => setVisible(false)}>
+          ✖
+        </button>
+        <h2>⏰ Próxima emisión</h2>
+        <p>¡Ya comenzó!</p>
+      </div>
+    );
+  }
 
   return (
-    <div
-      ref={widgetRef}
-      className="countdown-box"
-      style={{
-        left: position.x,
-        top: position.y,
-        position: "fixed",
-        cursor: dragging ? "grabbing" : "grab",
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-    >
+    <div className="countdown-box">
       {/* Botón de cerrar */}
       <button className="close-btn" onClick={() => setVisible(false)}>
         ✖
       </button>
 
       <h2>⏰ Próxima emisión</h2>
+      <div className="countdown-timer">
+        {Object.entries(timeLeft).map(([label, value]) => (
+          <span key={label}>
+            {value} <small>{label}</small>
+          </span>
+        ))}
+      </div>
 
-      {!timeLeft ? (
-        <p>¡Ya comenzó!</p>
-      ) : (
-        <>
-          <div className="countdown-timer">
-            {Object.entries(timeLeft).map(([label, value]) => (
-              <span key={label}>
-                {value} <small>{label}</small>
-              </span>
-            ))}
-          </div>
-
-          <button
-            className="btn-reminder"
-            onClick={handleReminder}
-            disabled={reminderSet}
-          >
-            {reminderSet ? "🔔 Recordatorio activado" : "🔔 Recordar"}
-          </button>
-        </>
-      )}
+      <button
+        className="btn-reminder"
+        onClick={handleReminder}
+        disabled={reminderSet}
+      >
+        {reminderSet ? "🔔 Recordatorio activado" : "🔔 Recordar"}
+      </button>
     </div>
   );
 };

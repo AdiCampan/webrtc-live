@@ -267,7 +267,6 @@ audio {
   box-shadow: 8px 12px 20px 14px rgb(0 0 0 / 44%);
   z-index: 1000;
   width: 180px;
-  user-select: none;
 }
 
 .countdown-box h2 {
