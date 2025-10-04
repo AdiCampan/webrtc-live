@@ -267,22 +267,8 @@ audio {
   box-shadow: 8px 12px 20px 14px rgb(0 0 0 / 44%);
   z-index: 1000;
   width: 180px;
+  user-select: none;
 }
-/* .countdown-widget {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(12px);
-  color: white;
-  padding: 1rem 1.5rem;
-  border-radius: 1rem;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-  font-weight: bold;
-  z-index: 1000;
-  text-align: center;
-  width: 220px;
-} */
 
 .countdown-box h2 {
   font-size: 1rem;
