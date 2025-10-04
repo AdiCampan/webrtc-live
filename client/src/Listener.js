@@ -26,9 +26,12 @@ const rtcConfig = {
   ],
 };
 
+import { useEffect, useRef, useState } from "react";
+
 function Listener({ signalingServer, language, setRole }) {
   const peerRef = useRef(null);
   const audioRef = useRef(null);
+  const broadcasterIdRef = useRef(null); // 🔑 Guardar el Broadcaster asignado
   const [connected, setConnected] = useState(false);
 
   const canvasRef = useRef(null);
@@ -54,7 +57,13 @@ function Listener({ signalingServer, language, setRole }) {
             await peer.restartIce();
             const offer = await peer.createOffer({ iceRestart: true });
             await peer.setLocalDescription(offer);
-            signalingServer.send(JSON.stringify({ type: "offer", offer }));
+            signalingServer.send(
+              JSON.stringify({
+                type: "offer",
+                offer,
+                target: broadcasterIdRef.current,
+              })
+            );
             console.log("🔁 ICE reiniciado con éxito");
           } catch (err) {
             console.error("❌ restartIce falló:", err);
@@ -137,9 +146,13 @@ function Listener({ signalingServer, language, setRole }) {
       };
 
       peer.onicecandidate = (event) => {
-        if (event.candidate) {
+        if (event.candidate && broadcasterIdRef.current) {
           signalingServer.send(
-            JSON.stringify({ type: "candidate", candidate: event.candidate })
+            JSON.stringify({
+              type: "candidate",
+              candidate: event.candidate,
+              target: broadcasterIdRef.current,
+            })
           );
         }
       };
@@ -153,12 +166,19 @@ function Listener({ signalingServer, language, setRole }) {
       console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
+        broadcasterIdRef.current = data.clientId; // 🔑 Guardamos el ID del Broadcaster
         if (peerRef.current) peerRef.current.close();
         const peer = createPeer();
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        signalingServer.send(JSON.stringify({ type: "answer", answer }));
+        signalingServer.send(
+          JSON.stringify({
+            type: "answer",
+            answer,
+            target: broadcasterIdRef.current,
+          })
+        );
         console.log("📤 Listener envió answer");
       }
 
@@ -223,6 +243,7 @@ function Listener({ signalingServer, language, setRole }) {
             audioCtxRef.current.close().catch(() => {
               audioCtxRef.current = null;
             });
+          broadcasterIdRef.current = null;
           if (typeof setRole === "function") setRole(null);
         }}
       >

@@ -103,7 +103,30 @@ function Broadcaster({ signalingServer, language, setRole }) {
     const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
 
-    // ICE reconexión automática
+    // Asegurar que el stream exista
+    if (!streamRef.current) {
+      try {
+        streamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: selectedDeviceId
+              ? { exact: selectedDeviceId }
+              : undefined,
+          },
+        });
+      } catch (err) {
+        console.error("❌ No se pudo acceder al micrófono:", err);
+        return;
+      }
+    }
+
+    // Agregar tracks activas
+    streamRef.current.getTracks().forEach((track) => {
+      if (track.readyState === "live") {
+        peer.addTrack(track, streamRef.current);
+      }
+    });
+
+    // ICE reconexión
     peer.oniceconnectionstatechange = async () => {
       const state = peer.iceConnectionState;
       console.log(`🔄 ICE state con ${clientId}:`, state);
@@ -125,11 +148,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
       }
     };
 
-    // Agregar tracks de audio
-    streamRef.current.getTracks().forEach((track) => {
-      peer.addTrack(track, streamRef.current);
-    });
-
     // Enviar candidates
     peer.onicecandidate = (event) => {
       if (event.candidate) {
@@ -143,6 +161,7 @@ function Broadcaster({ signalingServer, language, setRole }) {
       }
     };
 
+    // Crear y enviar offer
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
