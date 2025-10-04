@@ -54,8 +54,6 @@ function Listener({ signalingServer, language, setRole }) {
             await peer.restartIce();
             const offer = await peer.createOffer({ iceRestart: true });
             await peer.setLocalDescription(offer);
-
-            // ⚠️ No enviamos language aquí, el servidor conoce el idioma
             signalingServer.send(JSON.stringify({ type: "offer", offer }));
             console.log("🔁 ICE reiniciado con éxito");
           } catch (err) {
@@ -70,12 +68,11 @@ function Listener({ signalingServer, language, setRole }) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
 
-          // === Visualizador ===
-          try {
-            if (!audioCtxRef.current) {
+          // === Configurar visualizador ===
+          if (!audioCtxRef.current) {
+            try {
               const AudioCtx = window.AudioContext || window.webkitAudioContext;
               audioCtxRef.current = new AudioCtx();
-
               const analyser = audioCtxRef.current.createAnalyser();
               analyser.fftSize = 512;
               analyserRef.current = analyser;
@@ -90,8 +87,7 @@ function Listener({ signalingServer, language, setRole }) {
 
               const draw = () => {
                 const canvas = canvasRef.current;
-                const analyserLocal = analyserRef.current;
-                if (!canvas || !analyserLocal) return;
+                if (!canvas || !analyserRef.current) return;
 
                 const ctx = canvas.getContext("2d");
                 const width = canvas.width;
@@ -99,7 +95,7 @@ function Listener({ signalingServer, language, setRole }) {
                 ctx.clearRect(0, 0, width, height);
 
                 // Waveform
-                analyserLocal.getByteTimeDomainData(dataWaveRef.current);
+                analyserRef.current.getByteTimeDomainData(dataWaveRef.current);
                 ctx.lineWidth = 1.5;
                 ctx.strokeStyle = "#00ff99";
                 ctx.beginPath();
@@ -115,7 +111,7 @@ function Listener({ signalingServer, language, setRole }) {
                 ctx.stroke();
 
                 // Spectrum
-                analyserLocal.getByteFrequencyData(dataFreqRef.current);
+                analyserRef.current.getByteFrequencyData(dataFreqRef.current);
                 const barWidth = 3;
                 for (let i = 0; i < dataFreqRef.current.length; i += 4) {
                   const barHeight = (dataFreqRef.current[i] / 255) * height;
@@ -133,16 +129,15 @@ function Listener({ signalingServer, language, setRole }) {
 
               animRef.current = requestAnimationFrame(draw);
               console.log("🔎 Visualizer Listener iniciado");
+            } catch (err) {
+              console.warn("⚠️ Error iniciando visualizer:", err);
             }
-          } catch (err) {
-            console.warn("⚠️ Error iniciando visualizer (listener):", err);
           }
         }
       };
 
       peer.onicecandidate = (event) => {
         if (event.candidate) {
-          // ⚠️ No enviamos language aquí
           signalingServer.send(
             JSON.stringify({ type: "candidate", candidate: event.candidate })
           );
@@ -152,15 +147,14 @@ function Listener({ signalingServer, language, setRole }) {
       return peer;
     };
 
-    // Manejar mensajes del servidor
-    signalingServer.onmessage = async (event) => {
+    // Manejar mensajes WebSocket
+    const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
       console.log("📩 Listener recibió:", data);
 
       if (data.type === "offer") {
         if (peerRef.current) peerRef.current.close();
         const peer = createPeer();
-
         await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
@@ -180,7 +174,9 @@ function Listener({ signalingServer, language, setRole }) {
       }
     };
 
-    // Solicitar oferta del Broadcaster
+    signalingServer.addEventListener("message", handleMessage);
+
+    // Solicitar oferta al Broadcaster correspondiente
     const requestOffer = () => {
       signalingServer.send(JSON.stringify({ type: "request-offer", language }));
       console.log("📡 Listener solicitó oferta para idioma", language);
@@ -194,11 +190,11 @@ function Listener({ signalingServer, language, setRole }) {
 
     // Cleanup
     return () => {
+      signalingServer.removeEventListener("message", handleMessage);
       if (peerRef.current) peerRef.current.close();
       if (animRef.current) cancelAnimationFrame(animRef.current);
-      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
         audioCtxRef.current.close().catch(() => {});
-      }
     };
   }, [signalingServer, language]);
 
@@ -216,21 +212,19 @@ function Listener({ signalingServer, language, setRole }) {
 
       {!connected && <p>Esperando transmisión...</p>}
       <audio ref={audioRef} autoPlay controls />
+
       <button
         onClick={() => {
           if (peerRef.current) peerRef.current.close();
           peerRef.current = null;
-
           if (animRef.current) cancelAnimationFrame(animRef.current);
           if (audioRef.current) audioRef.current.srcObject = null;
-          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-            audioCtxRef.current.close().catch(() => {});
-            audioCtxRef.current = null;
-          }
-
+          if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
+            audioCtxRef.current.close().catch(() => {
+              audioCtxRef.current = null;
+            });
           if (typeof setRole === "function") setRole(null);
         }}
-        className="btn-back"
       >
         🔙 Volver
       </button>
