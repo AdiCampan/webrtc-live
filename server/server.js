@@ -78,12 +78,39 @@ wss.on("connection", (ws) => {
         return;
       }
 
-      // Reenviar a todos menos quien envió
-      wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === ws.OPEN) {
-          client.send(JSON.stringify({ ...data, clientId: ws.id }));
+      // Listener solicita oferta de un idioma
+      if (data.type === "request-offer" && data.language) {
+        ws.language = data.language; // guardamos idioma del listener
+        const targetBroadcaster = broadcasters[data.language];
+        if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
+          targetBroadcaster.send(
+            JSON.stringify({ type: "request-offer", clientId: ws.id })
+          );
+          console.log(
+            `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
+          );
         }
-      });
+        return;
+      }
+
+      // Reenvío estricto entre broadcaster y listener del mismo idioma
+      if (["offer", "answer", "candidate"].includes(data.type)) {
+        if (!data.language) {
+          console.warn("⚠️ Mensaje sin language, ignorado:", data);
+          return;
+        }
+        const targetClient = [...wss.clients].find(
+          (client) =>
+            client.id === data.target && client.language === data.language
+        );
+        if (targetClient && targetClient.readyState === ws.OPEN) {
+          targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
+          console.log(
+            `➡️ ${data.type} (${data.language}) reenviado de ${ws.id} a ${data.target}`
+          );
+        }
+        return;
+      }
     } catch (err) {
       console.error("❌ Error procesando mensaje:", err);
     }
