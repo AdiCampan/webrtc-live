@@ -63,6 +63,71 @@ button:disabled {
 }
 
 /* Colores de botones según rol */
+/* App.css */
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", "Roboto", sans-serif;
+  height: 100%;
+}
+
+.App {
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Fondo degradado fuerte */
+  background: linear-gradient(135deg, #6507ca, #200a3f);
+  color: #fff;
+  padding: 2rem;
+}
+
+/* Contenedor central */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+/* Titulos grandes */
+h1,
+h2 {
+  font-weight: 800;
+  margin: 0;
+}
+
+/* Botones grandes y modernos */
+button {
+  margin: 5px;
+  width: 100%;
+  padding: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Colores de botones según rol */
 .btn-broadcaster {
   background-color: #ff416c;
   background-image: linear-gradient(45deg, #ff416c, #ff4b2b);
@@ -177,5 +242,122 @@ audio {
     width: 100px; /* más pequeño para pantallas pequeñas */
     height: 100px;
     font-size: 1.2rem;
+  }
+}
+
+.btn-listener {
+  background-color: #1fa2ff;
+  background-image: linear-gradient(45deg, #1fa2ff, #12d8fa);
+  color: #fff;
+}
+
+.btn-listener:hover {
+  background-image: linear-gradient(45deg, #12d8fa, #1fa2ff);
+}
+
+/* Tarjeta para reproductor oyente */
+.audio-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 1.5rem;
+  padding: 2rem;
+  width: 100%;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+audio {
+  width: 100%;
+  border-radius: 1rem;
+  outline: none;
+}
+
+/* Responsivo */
+@media (max-width: 480px) {
+  button {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+}
+@media (max-width: 480px) {
+  .btn-language {
+    width: 120px;
+    height: 120px;
+    font-size: 1.5rem;
+  }
+}
+
+.language-buttons {
+  display: flex;
+  flex-wrap: wrap; /* permite que se muevan a la siguiente línea en móviles */
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.btn-language {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 1px 1px 2px black;
+  background-size: cover;
+  background-position: center;
+}
+
+.btn-language:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* cada idioma solo define el fondo */
+.btn-language.espanol {
+  background-image: url("./Assets/spanish-flag2.png");
+  background-size: 143% 143%;
+  /* background-size: contain;  */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #d32f2f; /* rojo de fondo para que combine */
+}
+
+.btn-language.ingles {
+  background-image: url("./Assets/english-flag.jpeg");
+}
+
+.btn-language.rumano {
+  background: linear-gradient(
+    to right,
+    #002b7f 0%,
+    /* Azul */ #002b7f 28%,
+    #fcd116 33%,
+    /* Amarillo */ #fcd116 66%,
+    #ff0000 70%,
+    /* Rojo */ #ff0000 100%
+  );
+}
+@media (max-width: 768px) {
+  .language-buttons {
+    flex-direction: column; /* en vertical */
+    gap: 15px;
+  }
+
+  .btn-language {
+    width: 110px; /* más pequeños */
+    height: 110px;
+    font-size: 1.4rem;
+  }
+
+  .btn-broadcaster {
+    font-size: 0.9rem;
+    padding: 0.7rem 1rem;
+    min-width: 160px;
   }
 }

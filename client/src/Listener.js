@@ -42,8 +42,33 @@ function Listener({ signalingServer, language, setRole }) {
       const peer = new RTCPeerConnection(rtcConfig);
       peerRef.current = peer;
 
-      peer.oniceconnectionstatechange = () => {
-        console.log("🔄 ICE state (Listener):", peer.iceConnectionState);
+      // peer.oniceconnectionstatechange = () => {
+      //   console.log("🔄 ICE state (Listener):", peer.iceConnectionState);
+      // };
+      peer.oniceconnectionstatechange = async () => {
+        const state = peer.iceConnectionState;
+        console.log(`🔄 ICE state con broadcaster:`, state);
+
+        if (state === "failed" || state === "disconnected") {
+          console.warn("⚠️ ICE falló, intentando restartIce");
+          try {
+            await peer.restartIce();
+            const offer = await peer.createOffer({ iceRestart: true });
+            await peer.setLocalDescription(offer);
+            signalingServer.send(
+              JSON.stringify({ type: "offer", offer, target: broadcasterId })
+            );
+            console.log("🔁 ICE reiniciado con éxito");
+          } catch (err) {
+            console.error("❌ restartIce falló, recreando Peer:", err);
+            // destruir peer viejo y crear uno nuevo
+            if (peers.current[broadcasterId]) {
+              peers.current[broadcasterId].close();
+              delete peers.current[broadcasterId];
+            }
+            await createPeer(broadcasterId);
+          }
+        }
       };
 
       peer.ontrack = (event) => {
@@ -233,6 +258,10 @@ function Listener({ signalingServer, language, setRole }) {
           maxWidth: "400px",
         }}
       />
+      <div style={{ marginTop: "10px", fontSize: "14px", color: "gray" }}>
+        Estado de conexión con el transmisor activo. Revisa consola para
+        detalles ICE.
+      </div>
     </div>
   );
 }
