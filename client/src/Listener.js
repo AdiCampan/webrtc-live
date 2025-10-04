@@ -42,31 +42,22 @@ function Listener({ signalingServer, language, setRole }) {
       const peer = new RTCPeerConnection(rtcConfig);
       peerRef.current = peer;
 
-      // peer.oniceconnectionstatechange = () => {
-      //   console.log("🔄 ICE state (Listener):", peer.iceConnectionState);
-      // };
       peer.oniceconnectionstatechange = async () => {
         const state = peer.iceConnectionState;
-        console.log(`🔄 ICE state con broadcaster:`, state);
+        console.log(`🔄 ICE state Listener:`, state);
 
         if (state === "failed" || state === "disconnected") {
-          console.warn("⚠️ ICE falló, intentando restartIce");
+          console.warn("⚠️ ICE falló, intentando restartIce...");
           try {
             await peer.restartIce();
             const offer = await peer.createOffer({ iceRestart: true });
             await peer.setLocalDescription(offer);
             signalingServer.send(
-              JSON.stringify({ type: "offer", offer, target: broadcasterId })
+              JSON.stringify({ type: "offer", offer, language })
             );
             console.log("🔁 ICE reiniciado con éxito");
           } catch (err) {
-            console.error("❌ restartIce falló, recreando Peer:", err);
-            // destruir peer viejo y crear uno nuevo
-            if (peers.current[broadcasterId]) {
-              peers.current[broadcasterId].close();
-              delete peers.current[broadcasterId];
-            }
-            await createPeer(broadcasterId);
+            console.error("❌ restartIce falló:", err);
           }
         }
       };
@@ -76,14 +67,15 @@ function Listener({ signalingServer, language, setRole }) {
         if (audioRef.current) {
           audioRef.current.srcObject = event.streams[0];
           setConnected(true);
-          // === Visualizer setup (Listener) ===
+
+          // === Visualizer setup ===
           try {
             if (!audioCtxRef.current) {
               const AudioCtx = window.AudioContext || window.webkitAudioContext;
               audioCtxRef.current = new AudioCtx();
 
               const analyser = audioCtxRef.current.createAnalyser();
-              analyser.fftSize = 512; // menos carga para móviles
+              analyser.fftSize = 512;
               analyserRef.current = analyser;
 
               const src = audioCtxRef.current.createMediaStreamSource(
@@ -120,7 +112,7 @@ function Listener({ signalingServer, language, setRole }) {
                 }
                 ctx.stroke();
 
-                // Spectrum (salteando barras para menos carga)
+                // Spectrum
                 analyserLocal.getByteFrequencyData(dataFreqRef.current);
                 const barWidth = 3;
                 for (let i = 0; i < dataFreqRef.current.length; i += 4) {
@@ -200,7 +192,7 @@ function Listener({ signalingServer, language, setRole }) {
       signalingServer.addEventListener("open", requestOffer, { once: true });
     }
 
-    // === Cleanup al desmontar ===
+    // Cleanup
     return () => {
       if (peerRef.current) peerRef.current.close();
       if (animRef.current) cancelAnimationFrame(animRef.current);
@@ -208,7 +200,7 @@ function Listener({ signalingServer, language, setRole }) {
         audioCtxRef.current.close().catch(() => {});
       }
     };
-  }, [signalingServer]);
+  }, [signalingServer, language]);
 
   return (
     <div>
@@ -226,11 +218,9 @@ function Listener({ signalingServer, language, setRole }) {
       <audio ref={audioRef} autoPlay controls />
       <button
         onClick={() => {
-          // Cerrar PeerConnection
           if (peerRef.current) peerRef.current.close();
           peerRef.current = null;
 
-          // Detener visualizador y audio
           if (animRef.current) cancelAnimationFrame(animRef.current);
           if (audioRef.current) audioRef.current.srcObject = null;
           if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
@@ -238,7 +228,6 @@ function Listener({ signalingServer, language, setRole }) {
             audioCtxRef.current = null;
           }
 
-          // Regresar a pantalla Home
           if (typeof setRole === "function") setRole(null);
         }}
         className="btn-back"
