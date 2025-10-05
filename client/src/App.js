@@ -13,7 +13,7 @@ import Countdown from "./Countdown";
 */
 
 function App() {
-  const nextEvent = "2025-10-05T01:45:00";
+  const nextEvent = "2025-10-05T12:00:00";
   // ws guarda la instancia actual de WebSocket que pasamos a los componentes.
   const [ws, setWs] = useState(null);
 
