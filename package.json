@@ -8,6 +8,7 @@
     "build": "npm install --prefix client && npm run build --prefix client"
   },
   "dependencies": {
-    "concurrently": "^8.0.1"
+    "concurrently": "^8.0.1",
+    "jsonwebtoken": "^9.0.2"
   }
 }
