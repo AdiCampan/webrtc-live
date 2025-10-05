@@ -2,6 +2,7 @@
   "name": "webrtc-audio",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix server\" \"npm start --prefix client\"",
     "start": "npm start --prefix server",
