@@ -27,7 +27,7 @@ const rtcConfig = {
   ],
 };
 
-function Broadcaster({ signalingServer, language, setRole }) {
+function Broadcaster({ signalingServer, language, token, setRole }) {
   const peers = useRef({});
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
@@ -106,14 +106,12 @@ function Broadcaster({ signalingServer, language, setRole }) {
     const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
 
-    // Agregar pistas de audio
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
         peer.addTrack(track, streamRef.current);
       });
     }
 
-    // ICE reconexión
     peer.oniceconnectionstatechange = async () => {
       const state = peer.iceConnectionState;
       console.log(`🔄 ICE state con ${clientId}:`, state);
@@ -135,7 +133,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
       }
     };
 
-    // Enviar candidates
     peer.onicecandidate = (event) => {
       if (event.candidate) {
         signalingServer.send(
@@ -148,7 +145,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
       }
     };
 
-    // Crear y enviar offer
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
@@ -163,6 +159,11 @@ function Broadcaster({ signalingServer, language, setRole }) {
 
   // Iniciar transmisión
   const startBroadcast = async () => {
+    if (!token) {
+      alert("⚠️ No tienes autorización para emitir. Por favor inicia sesión.");
+      return;
+    }
+
     if (!streamRef.current) {
       try {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
@@ -171,7 +172,6 @@ function Broadcaster({ signalingServer, language, setRole }) {
             : true,
         });
 
-        // Configurar visualizador
         if (!audioCtxRef.current) {
           const AudioCtx = window.AudioContext || window.webkitAudioContext;
           audioCtxRef.current = new AudioCtx();
@@ -232,8 +232,10 @@ function Broadcaster({ signalingServer, language, setRole }) {
       }
     }
 
-    // Registrar Broadcaster
-    signalingServer.send(JSON.stringify({ type: "broadcaster", language }));
+    // Registrar Broadcaster con JWT
+    signalingServer.send(
+      JSON.stringify({ type: "broadcaster", language, token })
+    );
     setBroadcasting(true);
   };
 
@@ -263,6 +265,7 @@ function Broadcaster({ signalingServer, language, setRole }) {
           ? "Inglés"
           : "Rumano"}
       </div>
+
       <div className="mic-selector">
         <label>🎤 Seleccionar micrófono:</label>
         <select

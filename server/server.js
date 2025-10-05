@@ -3,6 +3,7 @@ import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
+import jwt from "jsonwebtoken";
 
 // 🔹 Definir __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -10,11 +11,47 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const SECRET_KEY = "SUPER_SECRETO_123"; // Cambiar en producción
+
+// Middleware JSON
+app.use(express.json());
+
+// Usuarios de ejemplo
+const users = [
+  { username: "admin", password: "super123", role: "broadcaster" },
+  // Puedes agregar más usuarios si quieres
+];
+
+// Endpoint login
+app.post("/login", (req, res) => {
+  const { username, password } = req.body;
+  const user = users.find(
+    (u) => u.username === username && u.password === password
+  );
+
+  if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
+
+  const token = jwt.sign(
+    { username: user.username, role: user.role },
+    SECRET_KEY,
+    { expiresIn: "2h" }
+  );
+
+  res.json({ token, role: user.role });
+});
+
+// Middleware para verificar JWT en WebSocket
+const verifyToken = (token) => {
+  try {
+    return jwt.verify(token, SECRET_KEY);
+  } catch {
+    return null;
+  }
+};
 
 // Servir React build
 const clientBuildPath = path.join(__dirname, "../client/build");
 app.use(express.static(clientBuildPath));
-
 app.get("/*", (req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
@@ -30,11 +67,12 @@ const wss = new WebSocketServer({ server });
 // Mapa de Broadcasters por idioma
 const broadcasters = {}; // { es: ws, en: ws, ro: ws }
 
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
   ws.id = uuidv4();
-  console.log(`🔗 Cliente conectado: ${ws.id}`);
   ws.isBroadcaster = false;
   ws.language = null;
+
+  console.log(`🔗 Cliente conectado: ${ws.id}`);
 
   ws.on("message", (msg) => {
     try {
@@ -42,14 +80,25 @@ wss.on("connection", (ws) => {
       console.log(`📩 Mensaje recibido de ${ws.id}:`, data);
 
       // ==========================
-      // Registrar Broadcaster
+      // Registrar Broadcaster (con JWT)
       // ==========================
-      if (data.type === "broadcaster" && data.language) {
+      if (data.type === "broadcaster" && data.language && data.token) {
+        const decoded = verifyToken(data.token);
+        if (!decoded || decoded.role !== "broadcaster") {
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: "Token inválido o sin permisos",
+            })
+          );
+          return;
+        }
+
         ws.isBroadcaster = true;
         ws.language = data.language;
         broadcasters[data.language] = ws;
         console.log(
-          `🎙️ Broadcaster registrado para ${data.language}: ${ws.id}`
+          `🎙️ Broadcaster autorizado registrado para ${data.language}: ${ws.id}`
         );
         return;
       }
@@ -79,9 +128,7 @@ wss.on("connection", (ws) => {
       // ==========================
       // Reenvío estricto de mensajes (offer, answer, candidate)
       // ==========================
-      // Reenvío estricto entre broadcaster y listener del mismo idioma
       if (["offer", "answer", "candidate"].includes(data.type)) {
-        // Obtenemos el targetClient
         const targetClient = [...wss.clients].find(
           (client) => client.id === data.target
         );
@@ -90,7 +137,6 @@ wss.on("connection", (ws) => {
           return;
         }
 
-        // Validar que ambos (ws y target) tengan mismo idioma
         if (
           ws.language &&
           targetClient.language &&
@@ -115,7 +161,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
     if (ws.isBroadcaster && ws.language) {
-      delete broadcasters[ws.language]; // Eliminamos broadcaster desconectado
+      delete broadcasters[ws.language];
       console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
     }
   });

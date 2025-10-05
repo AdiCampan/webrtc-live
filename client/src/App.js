@@ -4,6 +4,7 @@ import Broadcaster from "./Broadcaster";
 import Listener from "./Listener";
 import "./App.css";
 import Countdown from "./Countdown";
+import Login from "./Login";
 /*
   App.js con:
     - reconexión automática WebSocket (backoff exponencial)
@@ -240,14 +241,17 @@ function App() {
           </div>
         )}
 
-        {/* Pasamos setRole */}
+        {!role && <Login onLogin={(data) => setRole(data)} />}
+
         {role?.role === "broadcaster" && (
           <Broadcaster
             signalingServer={ws}
             language={role.language}
             setRole={setRole}
+            token={role.token}
           />
         )}
+
         {role?.role === "listener" && (
           <Listener
             signalingServer={ws}
