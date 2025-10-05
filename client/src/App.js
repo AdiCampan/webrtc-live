@@ -16,10 +16,10 @@ function App() {
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
 
-  // Usuario logueado
+  // Usuario logueado (admin)
   const [user, setUser] = useState(null);
 
-  // Rol activo { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
+  // Rol activo
   const [role, setRole] = useState(null);
 
   // URL WebSocket
@@ -135,62 +135,59 @@ function App() {
         <h1 style={{ margin: "20px" }}>TRADUCCIÓN EN VIVO</h1>
 
         {!role && (
-          <div className="grid-container">
-            {/* Columna izquierda: login y broadcasters */}
-            <div className="left-column">
-              {!user && <Login onLogin={(data) => setUser(data)} />}
+          <div className="single-column">
+            {/* Oyentes */}
+            <h2>🎧 Escuchar transmisión</h2>
+            <div className="language-buttons">
+              <button
+                className="btn-language espanol"
+                onClick={() => setRole({ role: "listener", language: "es" })}
+              />
+              <button
+                className="btn-language ingles"
+                onClick={() => setRole({ role: "listener", language: "en" })}
+              />
+              <button
+                className="btn-language rumano"
+                onClick={() => setRole({ role: "listener", language: "ro" })}
+              />
+            </div>
 
-              {user && user.role === "broadcaster" && (
-                <div className="broadcaster-section">
-                  <h2>🎙️ Emitir transmisión</h2>
-                  <div className="broadcasters-container">
-                    <button
-                      onClick={() =>
-                        setRole({ role: "broadcaster", language: "es" })
-                      }
-                      className="btn-broadcaster"
-                    >
-                      🎙️ Español
-                    </button>
-                    <button
-                      onClick={() =>
-                        setRole({ role: "broadcaster", language: "en" })
-                      }
-                      className="btn-broadcaster"
-                    >
-                      🎙️ Inglés
-                    </button>
-                    <button
-                      onClick={() =>
-                        setRole({ role: "broadcaster", language: "ro" })
-                      }
-                      className="btn-broadcaster"
-                    >
-                      🎙️ Rumano
-                    </button>
-                  </div>
+            {/* Login solo si no hay sesión */}
+            {!user && <Login onLogin={(data) => setUser(data)} />}
+
+            {/* Broadcaster visible solo si está logueado */}
+            {user && user.role === "broadcaster" && (
+              <div className="broadcaster-section">
+                <h2>🎙️ Emitir transmisión</h2>
+                <div className="broadcasters-container">
+                  <button
+                    onClick={() =>
+                      setRole({ role: "broadcaster", language: "es" })
+                    }
+                    className="btn-broadcaster"
+                  >
+                    🎙️ Español
+                  </button>
+                  <button
+                    onClick={() =>
+                      setRole({ role: "broadcaster", language: "en" })
+                    }
+                    className="btn-broadcaster"
+                  >
+                    🎙️ Inglés
+                  </button>
+                  <button
+                    onClick={() =>
+                      setRole({ role: "broadcaster", language: "ro" })
+                    }
+                    className="btn-broadcaster"
+                  >
+                    🎙️ Rumano
+                  </button>
                 </div>
-              )}
-            </div>
-
-            {/* Columna derecha: listeners (público) */}
-            <div className="right-column">
-              <h2>🎧 Escuchar transmisión</h2>
-              <div className="language-buttons">
-                <button
-                  className="btn-language espanol"
-                  onClick={() => setRole({ role: "listener", language: "es" })}
-                />
-                <button
-                  className="btn-language ingles"
-                  onClick={() => setRole({ role: "listener", language: "en" })}
-                />
-                <button
-                  className="btn-language rumano"
-                  onClick={() => setRole({ role: "listener", language: "ro" })}
-                />
               </div>
-            </div>
+            )}
           </div>
         )}
 

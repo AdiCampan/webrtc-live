@@ -360,3 +360,22 @@ audio {
   justify-content: center;
   gap: 20px;
 }
+.single-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  margin: 20px auto;
+  max-width: 600px;
+}
+
+.language-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.broadcaster-section {
+  margin-top: 20px;
+  text-align: center;
+}
