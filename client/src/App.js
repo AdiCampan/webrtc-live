@@ -6,14 +6,6 @@ import "./App.css";
 import Countdown from "./Countdown";
 import Login from "./Login";
 
-/*
-  App.js con:
-    - reconexión automática WebSocket (backoff exponencial)
-    - keepalive (ping) para mantener la conexión viva
-    - limpieza de timers y socket al desmontar
-    - JWT: login separado de selección de idioma
-*/
-
 function App() {
   const nextEvent = "2025-10-05T12:00:00";
 
@@ -24,10 +16,10 @@ function App() {
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
 
-  // Usuario logueado { role: "broadcaster", token: "..." }
+  // Usuario logueado
   const [user, setUser] = useState(null);
 
-  // Selección de rol e idioma { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
+  // Rol activo { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
   const [role, setRole] = useState(null);
 
   // URL WebSocket
@@ -36,7 +28,7 @@ function App() {
     return `${protocol}://${window.location.host}`;
   })();
 
-  // ------ FUNCIONES DE CONEXIÓN Y RECONEXIÓN ------
+  // ----------------- WEBSOCKET -----------------
   const createWebSocket = (url) => {
     if (wsRef.current) {
       try {
@@ -108,17 +100,14 @@ function App() {
     }
   };
 
-  // ------ EFECTO PRINCIPAL ------
   useEffect(() => {
     createWebSocket(signalingUrl);
-
     return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
       stopKeepalive();
-
       if (wsRef.current) {
         try {
           wsRef.current.onopen = null;
@@ -131,7 +120,7 @@ function App() {
     };
   }, []);
 
-  // ------ UI ------
+  // ----------------- UI -----------------
   if (!ws) {
     return (
       <p className="text-center mt-10">
@@ -145,59 +134,62 @@ function App() {
       <div className="app-container">
         <h1 style={{ margin: "20px" }}>TRADUCCIÓN EN VIVO</h1>
 
-        {/* LOGIN */}
-        {!user && <Login onLogin={(data) => setUser(data)} />}
+        {!role && (
+          <div className="grid-container">
+            {/* Columna izquierda: login y broadcasters */}
+            <div className="left-column">
+              {!user && <Login onLogin={(data) => setUser(data)} />}
 
-        {/* SELECCIÓN DE ROL E IDIOMA */}
-        {user && !role && (
-          <div className="flex flex-col gap-6 w-full">
-            {/* Sección Broadcaster */}
-            {user.role === "broadcaster" && (
-              <div className="broadcaster-section">
-                <h2>🎙️ Emitir transmisión</h2>
-                <div className="broadcasters-container">
-                  <button
-                    onClick={() =>
-                      setRole({ role: "broadcaster", language: "es" })
-                    }
-                    className="btn-broadcaster"
-                  >
-                    🎙️ Español
-                  </button>
-                  <button
-                    onClick={() =>
-                      setRole({ role: "broadcaster", language: "en" })
-                    }
-                    className="btn-broadcaster"
-                  >
-                    🎙️ Inglés
-                  </button>
-                  <button
-                    onClick={() =>
-                      setRole({ role: "broadcaster", language: "ro" })
-                    }
-                    className="btn-broadcaster"
-                  >
-                    🎙️ Rumano
-                  </button>
+              {user && user.role === "broadcaster" && (
+                <div className="broadcaster-section">
+                  <h2>🎙️ Emitir transmisión</h2>
+                  <div className="broadcasters-container">
+                    <button
+                      onClick={() =>
+                        setRole({ role: "broadcaster", language: "es" })
+                      }
+                      className="btn-broadcaster"
+                    >
+                      🎙️ Español
+                    </button>
+                    <button
+                      onClick={() =>
+                        setRole({ role: "broadcaster", language: "en" })
+                      }
+                      className="btn-broadcaster"
+                    >
+                      🎙️ Inglés
+                    </button>
+                    <button
+                      onClick={() =>
+                        setRole({ role: "broadcaster", language: "ro" })
+                      }
+                      className="btn-broadcaster"
+                    >
+                      🎙️ Rumano
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Sección Listener */}
-            <div className="language-buttons">
-              <button
-                className="btn-language espanol"
-                onClick={() => setRole({ role: "listener", language: "es" })}
-              />
-              <button
-                className="btn-language ingles"
-                onClick={() => setRole({ role: "listener", language: "en" })}
-              />
-              <button
-                className="btn-language rumano"
-                onClick={() => setRole({ role: "listener", language: "ro" })}
-              />
+            {/* Columna derecha: listeners (público) */}
+            <div className="right-column">
+              <h2>🎧 Escuchar transmisión</h2>
+              <div className="language-buttons">
+                <button
+                  className="btn-language espanol"
+                  onClick={() => setRole({ role: "listener", language: "es" })}
+                />
+                <button
+                  className="btn-language ingles"
+                  onClick={() => setRole({ role: "listener", language: "en" })}
+                />
+                <button
+                  className="btn-language rumano"
+                  onClick={() => setRole({ role: "listener", language: "ro" })}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -224,7 +216,6 @@ function App() {
 
       <Countdown targetDate={nextEvent} />
 
-      {/* Footer */}
       <footer className="footer">
         <p>© EBEN-EZER Media 2025</p>
       </footer>
@@ -234,100 +225,221 @@ function App() {
 
 export default App;
 
-// import React, { useEffect, useState } from "react";
+// // src/App.js
+// import React, { useEffect, useRef, useState } from "react";
 // import Broadcaster from "./Broadcaster";
 // import Listener from "./Listener";
 // import "./App.css";
+// import Countdown from "./Countdown";
+// import Login from "./Login";
+
+// /*
+//   App.js con:
+//     - reconexión automática WebSocket (backoff exponencial)
+//     - keepalive (ping) para mantener la conexión viva
+//     - limpieza de timers y socket al desmontar
+//     - JWT: login separado de selección de idioma
+// */
 
 // function App() {
+//   const nextEvent = "2025-10-10T12:00:00";
+
+//   // WebSocket
 //   const [ws, setWs] = useState(null);
-//   const [role, setRole] = useState(null); // { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
+//   const wsRef = useRef(null);
+//   const reconnectAttemptRef = useRef(0);
+//   const reconnectTimeoutRef = useRef(null);
+//   const keepaliveIntervalRef = useRef(null);
 
-//   useEffect(() => {
+//   // Usuario logueado { role: "broadcaster", token: "..." }
+//   const [user, setUser] = useState(null);
+
+//   // Selección de rol e idioma { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
+//   const [role, setRole] = useState(null);
+
+//   // URL WebSocket
+//   const signalingUrl = (() => {
 //     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-//     const host = window.location.host;
-//     const signalingServer = new WebSocket(`${protocol}://${host}`);
-//     // para pruebas locales
-//     // const signalingServer = new WebSocket("ws://localhost:8080");
+//     return `${protocol}://${window.location.host}`;
+//   })();
 
-//     signalingServer.onopen = () => {
-//       console.log("✅ Conectado al servidor de señalización");
-//       setWs(signalingServer);
+//   // ------ FUNCIONES DE CONEXIÓN Y RECONEXIÓN ------
+//   const createWebSocket = (url) => {
+//     if (wsRef.current) {
+//       try {
+//         wsRef.current.onopen = null;
+//         wsRef.current.onclose = null;
+//         wsRef.current.onerror = null;
+//         wsRef.current.close();
+//       } catch (e) {}
+//       wsRef.current = null;
+//     }
+
+//     const socket = new WebSocket(url);
+//     wsRef.current = socket;
+//     setWs(socket);
+
+//     socket.onopen = () => {
+//       console.log("✅ WebSocket conectado");
+//       reconnectAttemptRef.current = 0;
+//       startKeepalive();
 //     };
 
-//     signalingServer.onerror = (err) =>
-//       console.error("❌ Error en WebSocket:", err);
-//     signalingServer.onclose = () => {
-//       console.log("⚠️ WebSocket cerrado");
+//     socket.onclose = (ev) => {
+//       console.warn("⚠️ WebSocket cerrado", ev);
+//       stopKeepalive();
+//       scheduleReconnect(url);
 //       setWs(null);
 //     };
 
-//     return () => {
+//     socket.onerror = (err) => {
+//       console.error("❌ Error WebSocket:", err);
 //       try {
-//         signalingServer.close();
-//       } catch {}
+//         socket.close();
+//       } catch (e) {}
+//     };
+
+//     return socket;
+//   };
+
+//   const scheduleReconnect = (url) => {
+//     if (reconnectTimeoutRef.current) return;
+//     const attempt = reconnectAttemptRef.current + 1;
+//     reconnectAttemptRef.current = attempt;
+//     const delay = Math.min(30000, Math.pow(2, attempt - 1) * 1000);
+//     console.log(`🔁 Intento de reconexión #${attempt} en ${delay}ms`);
+//     reconnectTimeoutRef.current = setTimeout(() => {
+//       reconnectTimeoutRef.current = null;
+//       createWebSocket(url);
+//     }, delay);
+//   };
+
+//   const startKeepalive = () => {
+//     stopKeepalive();
+//     keepaliveIntervalRef.current = setInterval(() => {
+//       const s = wsRef.current;
+//       if (s && s.readyState === WebSocket.OPEN) {
+//         try {
+//           s.send(JSON.stringify({ type: "ping", ts: Date.now() }));
+//         } catch (e) {
+//           console.warn("⚠️ Error enviando ping:", e);
+//         }
+//       }
+//     }, 25000);
+//   };
+
+//   const stopKeepalive = () => {
+//     if (keepaliveIntervalRef.current) {
+//       clearInterval(keepaliveIntervalRef.current);
+//       keepaliveIntervalRef.current = null;
+//     }
+//   };
+
+//   // ------ EFECTO PRINCIPAL ------
+//   useEffect(() => {
+//     createWebSocket(signalingUrl);
+
+//     return () => {
+//       if (reconnectTimeoutRef.current) {
+//         clearTimeout(reconnectTimeoutRef.current);
+//         reconnectTimeoutRef.current = null;
+//       }
+//       stopKeepalive();
+
+//       if (wsRef.current) {
+//         try {
+//           wsRef.current.onopen = null;
+//           wsRef.current.onclose = null;
+//           wsRef.current.onerror = null;
+//           wsRef.current.close();
+//         } catch (e) {}
+//         wsRef.current = null;
+//       }
 //     };
 //   }, []);
 
-//   if (!ws)
-//     return <p className="text-center mt-10">Conectando al servidor...</p>;
+//   // ------ UI ------
+//   if (!ws) {
+//     return (
+//       <p className="text-center mt-10">
+//         Conectando al servidor de señalización...
+//       </p>
+//     );
+//   }
 
 //   return (
 //     <div className="App">
 //       <div className="app-container">
-//         <h1>🎙️ Traducción en Vivo</h1>
+//         <h1 style={{ margin: "20px" }}>TRADUCCIÓN EN VIVO</h1>
 
-//         {!role && (
+//         {/* LOGIN */}
+//         {!user && <Login onLogin={(data) => setUser(data)} />}
+
+//         {/* SELECCIÓN DE ROL E IDIOMA */}
+//         {user && !role && (
 //           <div className="flex flex-col gap-6 w-full">
-//             <button
-//               onClick={() => setRole({ role: "broadcaster", language: "es" })}
-//               className="btn-broadcaster"
-//             >
-//               🚀 Iniciar Transmisión Español
-//             </button>
-//             <button
-//               onClick={() => setRole({ role: "broadcaster", language: "en" })}
-//               className="btn-broadcaster"
-//             >
-//               🚀 Iniciar Transmisión Inglés
-//             </button>
-//             <button
-//               onClick={() => setRole({ role: "broadcaster", language: "ro" })}
-//               className="btn-broadcaster"
-//             >
-//               🚀 Iniciar Transmisión Rumano
-//             </button>
+//             {/* Sección Broadcaster */}
+//             {user.role === "broadcaster" && (
+//               <div className="broadcaster-section">
+//                 <h2>🎙️ Emitir transmisión</h2>
+//                 <div className="broadcasters-container">
+//                   <button
+//                     onClick={() =>
+//                       setRole({ role: "broadcaster", language: "es" })
+//                     }
+//                     className="btn-broadcaster"
+//                   >
+//                     🎙️ Español
+//                   </button>
+//                   <button
+//                     onClick={() =>
+//                       setRole({ role: "broadcaster", language: "en" })
+//                     }
+//                     className="btn-broadcaster"
+//                   >
+//                     🎙️ Inglés
+//                   </button>
+//                   <button
+//                     onClick={() =>
+//                       setRole({ role: "broadcaster", language: "ro" })
+//                     }
+//                     className="btn-broadcaster"
+//                   >
+//                     🎙️ Rumano
+//                   </button>
+//                 </div>
+//               </div>
+//             )}
 
+//             {/* Sección Listener */}
 //             <div className="language-buttons">
 //               <button
 //                 className="btn-language espanol"
 //                 onClick={() => setRole({ role: "listener", language: "es" })}
-//               >
-//                 🇪🇸 Escuchar Español
-//               </button>
+//               />
 //               <button
 //                 className="btn-language ingles"
 //                 onClick={() => setRole({ role: "listener", language: "en" })}
-//               >
-//                 🇬🇧 Escuchar Inglés
-//               </button>
+//               />
 //               <button
 //                 className="btn-language rumano"
 //                 onClick={() => setRole({ role: "listener", language: "ro" })}
-//               >
-//                 🇷🇴 Escuchar Rumano
-//               </button>
+//               />
 //             </div>
 //           </div>
 //         )}
 
-//         {role?.role === "broadcaster" && (
+//         {/* Broadcaster */}
+//         {role?.role === "broadcaster" && user?.token && (
 //           <Broadcaster
 //             signalingServer={ws}
 //             language={role.language}
 //             setRole={setRole}
+//             token={user.token}
 //           />
 //         )}
+
+//         {/* Listener */}
 //         {role?.role === "listener" && (
 //           <Listener
 //             signalingServer={ws}
@@ -336,6 +448,13 @@ export default App;
 //           />
 //         )}
 //       </div>
+
+//       <Countdown targetDate={nextEvent} />
+
+//       {/* Footer */}
+//       <footer className="footer">
+//         <p>© EBEN-EZER Media 2025</p>
+//       </footer>
 //     </div>
 //   );
 // }

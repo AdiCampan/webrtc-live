@@ -335,3 +335,28 @@ audio {
 .close-btn:hover {
   color: #ff6b6b;
 }
+.grid-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin: 20px;
+}
+
+.left-column,
+.right-column {
+  padding: 20px;
+  border: 2px solid #ccc;
+  border-radius: 15px;
+  background: #f9f9f9;
+}
+
+.broadcaster-section,
+.language-buttons {
+  margin-top: 20px;
+}
+
+.language-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
