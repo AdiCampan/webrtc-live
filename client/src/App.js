@@ -5,40 +5,39 @@ import Listener from "./Listener";
 import "./App.css";
 import Countdown from "./Countdown";
 import Login from "./Login";
+
 /*
   App.js con:
     - reconexión automática WebSocket (backoff exponencial)
     - keepalive (ping) para mantener la conexión viva
     - limpieza de timers y socket al desmontar
-    - explica en comentarios por qué y qué cambia
+    - JWT: login separado de selección de idioma
 */
 
 function App() {
   const nextEvent = "2025-10-05T12:00:00";
-  // ws guarda la instancia actual de WebSocket que pasamos a los componentes.
+
+  // WebSocket
   const [ws, setWs] = useState(null);
-
-  // role: null | { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
-  const [role, setRole] = useState(null);
-
-  // refs para controlar reconexión/keepalive desde callbacks sin dependencia de render
   const wsRef = useRef(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
 
-  // URL del servidor de señalización (detecta ws/wss según el protocolo actual)
+  // Usuario logueado { role: "broadcaster", token: "..." }
+  const [user, setUser] = useState(null);
+
+  // Selección de rol e idioma { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
+  const [role, setRole] = useState(null);
+
+  // URL WebSocket
   const signalingUrl = (() => {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     return `${protocol}://${window.location.host}`;
   })();
 
-  // const signalingUrl = "ws://localhost:8080"; // para pruebas locales
-
   // ------ FUNCIONES DE CONEXIÓN Y RECONEXIÓN ------
-  // createWebSocket: crea el WebSocket y monta handlers básicos.
   const createWebSocket = (url) => {
-    // Si ya hay un socket abierto o en proceso, lo cerramos antes de crear otro.
     if (wsRef.current) {
       try {
         wsRef.current.onopen = null;
@@ -51,29 +50,23 @@ function App() {
 
     const socket = new WebSocket(url);
     wsRef.current = socket;
-    setWs(socket); // actualiza el estado para que los child components reciban la nueva instancia
+    setWs(socket);
 
-    // onopen: reset de contador de reintentos y start keepalive
     socket.onopen = () => {
       console.log("✅ WebSocket conectado");
-      reconnectAttemptRef.current = 0; // reset backoff
-      // iniciar el keepalive (ping) cada 25s para evitar cierres por inactividad
+      reconnectAttemptRef.current = 0;
       startKeepalive();
     };
 
-    // onclose: intentar reconectar con backoff exponencial
     socket.onclose = (ev) => {
       console.warn("⚠️ WebSocket cerrado", ev);
       stopKeepalive();
-      // Intentar reconectar con backoff exponencial (con tope)
       scheduleReconnect(url);
-      // Notificar estado a la app
       setWs(null);
     };
 
     socket.onerror = (err) => {
       console.error("❌ Error WebSocket:", err);
-      // En caso de error, cerramos el socket para entrar en onclose y reconectar
       try {
         socket.close();
       } catch (e) {}
@@ -82,12 +75,10 @@ function App() {
     return socket;
   };
 
-  // scheduleReconnect: programa un reintento con backoff exponencial (max 30s)
   const scheduleReconnect = (url) => {
-    if (reconnectTimeoutRef.current) return; // ya programado
+    if (reconnectTimeoutRef.current) return;
     const attempt = reconnectAttemptRef.current + 1;
     reconnectAttemptRef.current = attempt;
-    // backoff exponencial: 1s, 2s, 4s, 8s, ... hasta max 30s
     const delay = Math.min(30000, Math.pow(2, attempt - 1) * 1000);
     console.log(`🔁 Intento de reconexión #${attempt} en ${delay}ms`);
     reconnectTimeoutRef.current = setTimeout(() => {
@@ -96,21 +87,18 @@ function App() {
     }, delay);
   };
 
-  // startKeepalive: envia un ping periódico para mantener el socket vivo.
-  // Nota: el servidor no necesita responder necesariamente, esto evita timeouts
   const startKeepalive = () => {
-    stopKeepalive(); // evitar duplicados
+    stopKeepalive();
     keepaliveIntervalRef.current = setInterval(() => {
       const s = wsRef.current;
       if (s && s.readyState === WebSocket.OPEN) {
         try {
-          // Envía un mensaje simple "ping". Puedes adaptar formato si tu servidor esperara otro.
           s.send(JSON.stringify({ type: "ping", ts: Date.now() }));
         } catch (e) {
           console.warn("⚠️ Error enviando ping:", e);
         }
       }
-    }, 25000); // cada 25 segundos
+    }, 25000);
   };
 
   const stopKeepalive = () => {
@@ -120,21 +108,17 @@ function App() {
     }
   };
 
-  // ------ EFECTO PRINCIPAL: crear la conexión al montar el componente ------
+  // ------ EFECTO PRINCIPAL ------
   useEffect(() => {
-    // crear socket por primera vez
     createWebSocket(signalingUrl);
 
-    // limpiar todo al desmontar
     return () => {
-      // cancelar reconexión programada
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
       stopKeepalive();
 
-      // cerrar socket si existe
       if (wsRef.current) {
         try {
           wsRef.current.onopen = null;
@@ -145,27 +129,10 @@ function App() {
         wsRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // se ejecuta solo una vez al montar
+  }, []);
 
-  // ------ AYUDA: función para forzar re-negotiation en los peers si detectan ICE fail ------
-  // No es estrictamente parte de App.js, pero útil para pasar a componentes.
-  // Los componentes Broadcaster/Listener deberían escuchar el estado 'iceConnectionState'
-  // y, cuando detecten "failed" o "disconnected", llamar a pc.restartIce() o re-crear la PC.
-  //
-  // (Aquí sólo lo dejamos documentado; la lógica de reintento ICE se implementa en esos archivos).
-  //
-  // Ejemplo en un PeerConnection:
-  // peer.oniceconnectionstatechange = () => {
-  //   if (['failed','disconnected'].includes(peer.iceConnectionState)) {
-  //     try { peer.restartIce(); } catch(e) { /*recrear Peer si necesario*/ }
-  //   }
-  // }
-
-  // ------ UI: selección de rol / idioma ------
+  // ------ UI ------
   if (!ws) {
-    // Mientras el WebSocket no está listo mostramos mensaje, los componentes
-    // (listener/broadcaster) registran handlers 'open' para cuando ws se conecte.
     return (
       <p className="text-center mt-10">
         Conectando al servidor de señalización...
@@ -178,52 +145,46 @@ function App() {
       <div className="app-container">
         <h1 style={{ margin: "20px" }}>TRADUCCIÓN EN VIVO</h1>
 
-        {!role && (
+        {/* LOGIN */}
+        {!user && <Login onLogin={(data) => setUser(data)} />}
+
+        {/* SELECCIÓN DE ROL E IDIOMA */}
+        {user && !role && (
           <div className="flex flex-col gap-6 w-full">
-            {/* Sección transmisores */}
-            <div className="broadcaster-section">
-              <h2>🎙️ Emitir transmisión</h2>
-              <div className="broadcasters-container">
-                <button
-                  onClick={() =>
-                    setRole({ role: "broadcaster", language: "es" })
-                  }
-                  className="btn-broadcaster"
-                >
-                  🎙️ Español
-                </button>
-                <button
-                  onClick={() =>
-                    setRole({ role: "broadcaster", language: "en" })
-                  }
-                  className="btn-broadcaster"
-                >
-                  🎙️ Inglés
-                </button>
-                <button
-                  onClick={() =>
-                    setRole({ role: "broadcaster", language: "ro" })
-                  }
-                  className="btn-broadcaster"
-                >
-                  🎙️ Rumano
-                </button>
+            {/* Sección Broadcaster */}
+            {user.role === "broadcaster" && (
+              <div className="broadcaster-section">
+                <h2>🎙️ Emitir transmisión</h2>
+                <div className="broadcasters-container">
+                  <button
+                    onClick={() =>
+                      setRole({ role: "broadcaster", language: "es" })
+                    }
+                    className="btn-broadcaster"
+                  >
+                    🎙️ Español
+                  </button>
+                  <button
+                    onClick={() =>
+                      setRole({ role: "broadcaster", language: "en" })
+                    }
+                    className="btn-broadcaster"
+                  >
+                    🎙️ Inglés
+                  </button>
+                  <button
+                    onClick={() =>
+                      setRole({ role: "broadcaster", language: "ro" })
+                    }
+                    className="btn-broadcaster"
+                  >
+                    🎙️ Rumano
+                  </button>
+                </div>
               </div>
+            )}
 
-              {/* Caja de texto informativo */}
-            </div>
-            <div>
-              <div className="info-box">
-                <p>
-                  ℹ️ Bienvenidos a la sección de audio de la Iglesia EBEN-EZER
-                  de Castellón de la Plana. Aquí pueden escuchar el programa de
-                  audio en el idioma que prefieran, todos los domingos de 10:00
-                  a 12:00 y de 18:00 a 20:00.
-                </p>
-              </div>
-            </div>
-
-            {/* Botones oyentes */}
+            {/* Sección Listener */}
             <div className="language-buttons">
               <button
                 className="btn-language espanol"
@@ -241,17 +202,17 @@ function App() {
           </div>
         )}
 
-        {!role && <Login onLogin={(data) => setRole(data)} />}
-
-        {role?.role === "broadcaster" && (
+        {/* Broadcaster */}
+        {role?.role === "broadcaster" && user?.token && (
           <Broadcaster
             signalingServer={ws}
             language={role.language}
             setRole={setRole}
-            token={role.token}
+            token={user.token}
           />
         )}
 
+        {/* Listener */}
         {role?.role === "listener" && (
           <Listener
             signalingServer={ws}
@@ -260,6 +221,7 @@ function App() {
           />
         )}
       </div>
+
       <Countdown targetDate={nextEvent} />
 
       {/* Footer */}
