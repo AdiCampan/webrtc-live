@@ -1,12 +1,17 @@
-/* GENERAL */
-body,
-html {
+body {
   margin: 0;
   padding: 0;
   font-family: "Inter", "Roboto", sans-serif;
-  background: linear-gradient(135deg, #b0b0b0, #1e1033);
   color: #fff;
-  height: 100%;
+  background: #1e1033;
+  background: linear-gradient(135deg, #b0b0b0, #1e1033);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+html {
+  margin: 0;
+  padding: 0;
+  height: auto;
 }
 
 .App {
@@ -17,15 +22,17 @@ html {
 
 /* GRID */
 .grid-layout {
+  margin-top: 20px;
+  margin-inline: auto;
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1.6fr 1fr; /* laterales más estrechos */
-  gap: 25px;
+  gap: 20px;
   width: 95%;
   max-width: 1400px;
-  margin: auto;
+  /* margin: auto; */
   box-sizing: border-box;
-  padding-bottom: 80px; /* espacio para el footer sticky */
+  padding-bottom: 50px; /* espacio para el footer sticky */
 }
 
 /* COLUMNAS */
@@ -40,12 +47,13 @@ html {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  max-height: calc(100vh - 150px); /* adaptadas a la pantalla */
+  align-items: center;
+  max-height: calc(105vh - 150px); /* adaptadas a la pantalla */
 }
 
 /* Login más estrecho */
 .left-column form {
-  max-width: 90%;
+  max-width: 80%;
   margin: 0 auto;
 }
 
@@ -65,6 +73,17 @@ html {
 .text-box.small {
   font-size: 0.9rem;
 }
+/* Caja de texto informativo */
+.info-box {
+  margin-top: 1rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-left: 5px solid #1fa2ff;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  font-size: 0.89rem;
+  text-align: left;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
 
 /* INFO BOX */
 .info-box {
@@ -80,7 +99,7 @@ html {
   justify-content: center;
   gap: 15px;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin: 1rem;
 }
 .btn-language {
   width: 110px;
@@ -105,6 +124,25 @@ html {
   background-image: url("./Assets/romanian-flag.png");
 }
 
+/* Ajuste para pantallas medianas */
+@media (max-width: 900px) {
+  .btn-language {
+    width: 80px;
+    height: 80px;
+  }
+}
+
+/* Ajuste para pantallas pequeñas */
+@media (max-width: 600px) {
+  .language-buttons {
+    gap: 8px; /* menos espacio entre botones */
+  }
+  .btn-language {
+    width: 60px;
+    height: 60px;
+  }
+}
+
 /* BROADCASTER */
 .broadcasters-container {
   display: flex;
@@ -125,13 +163,70 @@ html {
   background: linear-gradient(45deg, #ff4b2b, #ff416c);
 }
 
-/* COUNTDOWN */
 .countdown-box {
-  margin-top: auto;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 0.8rem;
+  background: rgb(39, 39, 39);
   border-radius: 1rem;
+  padding: 1rem 1.2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   text-align: center;
+  color: #fff;
+  width: 100%;
+  max-width: 300px;
+  margin: 1rem auto;
+  box-sizing: border-box;
+}
+.countdown-box h2 {
+  font-size: 1rem;
+  color: #ffd700;
+  margin-bottom: 0.6rem;
+}
+
+.countdown-timer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.countdown-timer span {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  min-width: 40px;
+  text-align: center;
+}
+
+.countdown-timer small {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: normal;
+  color: #ccc;
+}
+
+.btn-reminder {
+  margin-top: 0.8rem;
+  background: linear-gradient(45deg, #ffd700, #ff9800);
+  color: #000;
+  border: none;
+  border-radius: 1rem;
+  padding: 0.6rem 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.btn-reminder:hover:not(:disabled) {
+  background: linear-gradient(45deg, #ff9800, #ffd700);
+  transform: translateY(-2px);
+}
+
+.btn-reminder:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* CONTACTO */
@@ -167,18 +262,31 @@ html {
   text-align: center;
   font-size: 0.8rem;
   color: #ddd;
-  padding: 0.5rem;
+  padding: 0.4rem;
   width: 100%;
 }
 
-/* RESPONSIVE */
+/* Responsive móvil */
 @media (max-width: 900px) {
   .grid-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* una columna */
     gap: 15px;
   }
-  .left-column,
+
+  /* Cambiar orden de columnas */
+  .center-column {
+    order: 1; /* primero */
+  }
+  .left-column {
+    order: 2; /* segundo */
+  }
+  .right-column {
+    order: 3; /* tercero */
+  }
+
+  /* quitar max-height para que las cajas se vean completas */
   .center-column,
+  .left-column,
   .right-column {
     max-height: unset;
   }
@@ -220,6 +328,73 @@ html {
     transform: scale(1.2);
     opacity: 1;
   }
+}
+.listener-container,
+.broadcaster-container {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  max-height: 300px; /* menos espacio */
+  overflow-y: auto;
+}
+
+/* Player y visualizador más compacto */
+.listener-container audio,
+.broadcaster-container audio {
+  width: 100%;
+  height: 40px;
+}
+
+.listener-container canvas,
+.broadcaster-container canvas {
+  width: 100%;
+  height: 50px;
+}
+.right-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* todo centrado */
+  text-align: center; /* centra el texto */
+  padding: 1.5rem;
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  max-height: calc(105vh - 150px);
+  overflow-y: auto;
+}
+
+/* Texto informativo */
+.text-box.right {
+  text-align: center;
+  font-size: 0.9rem; /* un poco más pequeño para caber todo */
+  margin-bottom: 1rem;
+}
+
+/* Contacto centrado y más pequeño */
+.contact-box {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.btn-contact {
+  padding: 0.4rem 0.8rem; /* más pequeño */
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  border-radius: 0.8rem;
+  background: linear-gradient(45deg, #ffd700, #ff9800);
+  color: black;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.btn-contact:hover {
+  transform: translateY(-2px);
 }
 
 /* body,

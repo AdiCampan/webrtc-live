@@ -82,9 +82,9 @@ const Countdown = ({ targetDate }) => {
   return (
     <div className="countdown-box">
       {/* Botón de cerrar */}
-      <button className="close-btn" onClick={() => setVisible(false)}>
+      {/* <button className="close-btn" onClick={() => setVisible(false)}>
         ✖
-      </button>
+      </button> */}
 
       <h2>⏰ Próxima emisión</h2>
       <div className="countdown-timer">

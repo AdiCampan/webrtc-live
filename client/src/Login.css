@@ -1,11 +1,12 @@
 /* src/Login.css */
 
 .login-container {
-  width: 320px;
-  margin: 50px auto;
-  padding: 30px;
+  max-width: 280px;
+  width: 85%;
+  margin: 20px auto;
+  padding: 20px;
   border-radius: 15px;
-  background-color: #1a1a1a;
+  background-color: rgb(39, 39, 39);
   color: #fff;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
   display: flex;
@@ -16,13 +17,13 @@
 }
 
 .login-container h2 {
-  margin-bottom: 15px;
-  font-size: 1.5em;
+  margin-bottom: 10px;
+  font-size: 1.2em;
   text-align: center;
 }
 
 .login-container input {
-  width: 90%;
+  width: 95%;
   padding: 10px;
   border-radius: 10px;
   border: 1px solid #444;
@@ -37,9 +38,9 @@
 }
 
 .login-container button {
-  width: 50%;
+  width: 100%;
   padding: 10px;
-  border-radius: 10px;
+  border-radius: 15px;
   border: none;
   background-color: #00ffcc;
   color: #000;

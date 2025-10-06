@@ -7,7 +7,7 @@ import Countdown from "./Countdown";
 import Login from "./Login";
 
 function App() {
-  const nextEvent = "2025-10-05T12:00:00";
+  const nextEvent = "2025-10-15T12:00:00";
 
   // WebSocket
   const [ws, setWs] = useState(null);
@@ -27,6 +27,8 @@ function App() {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     return `${protocol}://${window.location.host}`;
   })();
+
+  // const signalingUrl = "ws://localhost:8080"; // para pruebas locales
 
   // ----------------- WEBSOCKET -----------------
   const createWebSocket = (url) => {
@@ -145,123 +147,95 @@ function App() {
   return (
     <div className="App">
       <div className="grid-layout">
-        {/* 🟣 IZQUIERDA */}
+        {/* COLUMNA IZQUIERDA */}
         <div className="left-column">
           {!user && <Login onLogin={(data) => setUser(data)} />}
-
-          <div className="text-box small">
-            <h3>ℹ️ Bienvenido</h3>
-            <p>
-              Aquí puedes acceder a tu cuenta como traductor o administrador. Si
-              no tienes acceso, por favor contacta con el responsable técnico
-              del servicio.
-            </p>
-          </div>
-
+          {/* <div className="text-box small">
+            Aquí va la información extra de la columna izquierda (15 líneas
+            aprox)...
+          </div> */}
           <Countdown targetDate={nextEvent} />
         </div>
 
-        {/* 🔵 CENTRO */}
         <div className="center-column">
           <h1>TRADUCCIÓN EN VIVO</h1>
 
+          {/* Caja de texto central */}
           <div className="info-box">
-            <p>
-              Transmitimos cada domingo desde Castellón de la Plana en tres
-              idiomas: Español, Inglés y Rumano. Puedes escuchar en directo
-              seleccionando tu idioma preferido a continuación.
-            </p>
-            <p>
-              Nuestro propósito es llevar el mensaje de fe a toda persona,
-              facilitando la comprensión en su lengua materna. Gracias por
-              acompañarnos.
-            </p>
+            Bienvenidos a la transmisión en vivo con traducción simultánea de
+            Iglesia Pentecostal Rumana EBEN-EZER Castellon de la Plana <br />
+            <br /> El horario de las emisiones será:
+            <ul>
+              <li>Domingos 10:00 -12:00 y 18:00 - 20:00</li>
+              <li>Martes 20:00 - 21:30</li>
+              <li>Jueves 20:00 -21:30 </li>
+            </ul>
+            Si necesitas Auriculare/cascos adaptadores, contacta con el equipo
+            de sonido. ¡Gracias por acompañarnos!
           </div>
 
-          <h2>🎧 Escuchar transmisión</h2>
-          <div className="language-buttons">
-            <button
-              className="btn-language espanol"
-              onClick={() => setRole({ role: "listener", language: "es" })}
-            />
-            <button
-              className="btn-language ingles"
-              onClick={() => setRole({ role: "listener", language: "en" })}
-            />
-            <button
-              className="btn-language rumano"
-              onClick={() => setRole({ role: "listener", language: "ro" })}
-            />
-          </div>
+          {/* Botones de escuchar solo si no se ha seleccionado rol */}
+          {!role && (
+            <div className="language-buttons">
+              <button
+                className="btn-language espanol"
+                onClick={() => setRole({ role: "listener", language: "es" })}
+              />
+              <button
+                className="btn-language ingles"
+                onClick={() => setRole({ role: "listener", language: "en" })}
+              />
+              <button
+                className="btn-language rumano"
+                onClick={() => setRole({ role: "listener", language: "ro" })}
+              />
+            </div>
+          )}
 
-          {user && user.role === "broadcaster" && (
-            <div className="broadcaster-section">
-              <h2>🎙️ Emitir transmisión</h2>
-              <div className="broadcasters-container">
-                <button
-                  onClick={() =>
-                    setRole({ role: "broadcaster", language: "es" })
-                  }
-                  className="btn-broadcaster"
-                >
-                  🎙️ Español
-                </button>
-                <button
-                  onClick={() =>
-                    setRole({ role: "broadcaster", language: "en" })
-                  }
-                  className="btn-broadcaster"
-                >
-                  🎙️ Inglés
-                </button>
-                <button
-                  onClick={() =>
-                    setRole({ role: "broadcaster", language: "ro" })
-                  }
-                  className="btn-broadcaster"
-                >
-                  🎙️ Rumano
-                </button>
-              </div>
+          {/* Listener */}
+          {role?.role === "listener" && (
+            <div className="listener-container">
+              <Listener
+                signalingServer={ws}
+                language={role.language}
+                setRole={setRole}
+              />
+            </div>
+          )}
+
+          {/* Broadcaster */}
+          {role?.role === "broadcaster" && user?.token && (
+            <div className="broadcaster-container">
+              <Broadcaster
+                signalingServer={ws}
+                language={role.language}
+                setRole={setRole}
+                token={user.token}
+              />
             </div>
           )}
         </div>
 
-        {/* 🟢 DERECHA */}
+        {/* COLUMNA DERECHA */}
         <div className="right-column">
+          <h2>Información y contacto</h2>
+          <div className="logo-placeholder">Logo</div>
+          <div className="text-box right">
+            Dirección: Calle Ejemplo 123, Ciudad
+            <br />
+            Teléfono: +34 123 456 789
+            <br />
+            Email: contacto@ejemplo.com
+            <br />
+            Horario: Lunes a Viernes 9:00 - 18:00
+          </div>
           <div className="contact-box">
-            <h3>🏛️ EBEN-EZER Castellón</h3>
-            <div className="logo-placeholder">LOGO</div>
-            <p>Calle Mayor 123, Castellón de la Plana</p>
-            <p>Tel: +34 600 123 456</p>
-            <p>Email: contacto@ebenezer.org</p>
-            <p>Horario: Domingos 10:00–12:00 / 18:00–20:00</p>
-            <button className="btn-contact">📩 Contactar</button>
+            <button className="btn-contact">Contáctanos</button>
           </div>
         </div>
       </div>
 
-      {/* STREAMING */}
-      {role?.role === "broadcaster" && user?.token && (
-        <Broadcaster
-          signalingServer={ws}
-          language={role.language}
-          setRole={setRole}
-          token={user.token}
-        />
-      )}
-
-      {role?.role === "listener" && (
-        <Listener
-          signalingServer={ws}
-          language={role.language}
-          setRole={setRole}
-        />
-      )}
-
-      <footer className="footer">
-        <p>© EBEN-EZER Media 2025</p>
-      </footer>
+      <footer className="footer">© EBEN-EZER Media 2025</footer>
     </div>
   );
 }
@@ -305,6 +279,8 @@ export default App;
 //     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
 //     return `${protocol}://${window.location.host}`;
 //   })();
+
+//   const signalingUrl = "ws://localhost:8080"; // para pruebas locales
 
 //   // ------ FUNCIONES DE CONEXIÓN Y RECONEXIÓN ------
 //   const createWebSocket = (url) => {
