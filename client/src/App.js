@@ -131,87 +131,125 @@ function App() {
 
   return (
     <div className="App">
-      <div className="app-container">
-        <h1 style={{ margin: "20px" }}>TRADUCCIÓN EN VIVO</h1>
+      <header>
+        <h1>TRADUCCIÓN EN VIVO</h1>
+      </header>
 
-        {!role && (
-          <div className="single-column">
-            {/* Oyentes */}
-            <h2>🎧 Escuchar transmisión</h2>
-            <div className="language-buttons">
-              <button
-                className="btn-language espanol"
-                onClick={() => setRole({ role: "listener", language: "es" })}
-              />
-              <button
-                className="btn-language ingles"
-                onClick={() => setRole({ role: "listener", language: "en" })}
-              />
-              <button
-                className="btn-language rumano"
-                onClick={() => setRole({ role: "listener", language: "ro" })}
-              />
-            </div>
+      {/* 🧱 Grid principal */}
+      <div className="grid-layout">
+        {/* 🟣 COLUMNA IZQUIERDA */}
+        <div className="left-column">
+          {!user && <Login onLogin={(data) => setUser(data)} />}
 
-            {/* Login solo si no hay sesión */}
-            {!user && <Login onLogin={(data) => setUser(data)} />}
-
-            {/* Broadcaster visible solo si está logueado */}
-            {user && user.role === "broadcaster" && (
-              <div className="broadcaster-section">
-                <h2>🎙️ Emitir transmisión</h2>
-                <div className="broadcasters-container">
-                  <button
-                    onClick={() =>
-                      setRole({ role: "broadcaster", language: "es" })
-                    }
-                    className="btn-broadcaster"
-                  >
-                    🎙️ Español
-                  </button>
-                  <button
-                    onClick={() =>
-                      setRole({ role: "broadcaster", language: "en" })
-                    }
-                    className="btn-broadcaster"
-                  >
-                    🎙️ Inglés
-                  </button>
-                  <button
-                    onClick={() =>
-                      setRole({ role: "broadcaster", language: "ro" })
-                    }
-                    className="btn-broadcaster"
-                  >
-                    🎙️ Rumano
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="text-box">
+            <h3>📜 Información general</h3>
+            <p>
+              Somos la Iglesia EBEN-EZER de Castellón de la Plana. Nuestro
+              objetivo es compartir el mensaje de fe y esperanza en diferentes
+              idiomas. Aquí encontrarás todos los recursos necesarios para
+              conectarte a nuestras transmisiones y participar activamente en la
+              comunidad.
+            </p>
+            <p>
+              Transmitimos en directo cada domingo por la mañana y tarde, y
+              también podrás acceder a eventos especiales y sesiones de oración.
+            </p>
           </div>
-        )}
 
-        {/* Broadcaster */}
-        {role?.role === "broadcaster" && user?.token && (
-          <Broadcaster
-            signalingServer={ws}
-            language={role.language}
-            setRole={setRole}
-            token={user.token}
-          />
-        )}
+          <Countdown targetDate={nextEvent} />
+        </div>
 
-        {/* Listener */}
-        {role?.role === "listener" && (
-          <Listener
-            signalingServer={ws}
-            language={role.language}
-            setRole={setRole}
-          />
-        )}
+        {/* 🔵 COLUMNA CENTRAL */}
+        <div className="center-column">
+          <div className="info-box">
+            <p>
+              ℹ️ Bienvenido a la sección de traducción simultánea. Aquí podrás
+              escuchar las transmisiones en el idioma que elijas. Nuestras
+              emisiones en directo se realizan los domingos de 10:00 a 12:00 y
+              de 18:00 a 20:00.
+            </p>
+          </div>
+
+          <h2>🎧 Escuchar transmisión</h2>
+          <div className="language-buttons">
+            <button
+              className="btn-language espanol"
+              onClick={() => setRole({ role: "listener", language: "es" })}
+            />
+            <button
+              className="btn-language ingles"
+              onClick={() => setRole({ role: "listener", language: "en" })}
+            />
+            <button
+              className="btn-language rumano"
+              onClick={() => setRole({ role: "listener", language: "ro" })}
+            />
+          </div>
+
+          {user && user.role === "broadcaster" && (
+            <div className="broadcaster-section">
+              <h2>🎙️ Emitir transmisión</h2>
+              <div className="broadcasters-container">
+                <button
+                  onClick={() =>
+                    setRole({ role: "broadcaster", language: "es" })
+                  }
+                  className="btn-broadcaster"
+                >
+                  🎙️ Español
+                </button>
+                <button
+                  onClick={() =>
+                    setRole({ role: "broadcaster", language: "en" })
+                  }
+                  className="btn-broadcaster"
+                >
+                  🎙️ Inglés
+                </button>
+                <button
+                  onClick={() =>
+                    setRole({ role: "broadcaster", language: "ro" })
+                  }
+                  className="btn-broadcaster"
+                >
+                  🎙️ Rumano
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 🟢 COLUMNA DERECHA */}
+        <div className="right-column">
+          <div className="contact-box">
+            <h3>🏛️ EBEN-EZER Castellón</h3>
+            <div className="logo-placeholder">[ LOGO ]</div>
+            <p>Calle Mayor 123, Castellón de la Plana</p>
+            <p>Tel: +34 600 123 456</p>
+            <p>Email: contacto@ebenezer.org</p>
+            <p>Horario: Domingos 10:00–12:00 / 18:00–20:00</p>
+            <button className="btn-contact">📩 Contactar</button>
+          </div>
+        </div>
       </div>
 
-      <Countdown targetDate={nextEvent} />
+      {/* Contenido dinámico */}
+      {role?.role === "broadcaster" && user?.token && (
+        <Broadcaster
+          signalingServer={ws}
+          language={role.language}
+          setRole={setRole}
+          token={user.token}
+        />
+      )}
+
+      {role?.role === "listener" && (
+        <Listener
+          signalingServer={ws}
+          language={role.language}
+          setRole={setRole}
+        />
+      )}
 
       <footer className="footer">
         <p>© EBEN-EZER Media 2025</p>

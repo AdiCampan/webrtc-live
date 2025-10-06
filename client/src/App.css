@@ -1,41 +1,201 @@
-/* App.css */
-
-/* Reset y tipografía */
+/* Reset básico */
 body,
+html {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", "Roboto", sans-serif;
+  background: linear-gradient(135deg, #b0b0b0, #1e1033);
+  color: #fff;
+  min-height: 100vh;
+}
+
+/* Estructura general */
+.App {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+header h1 {
+  margin: 30px 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* 🧱 Grid principal */
+.grid-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 25px;
+  width: 95%;
+  max-width: 1400px;
+  margin-bottom: 40px;
+}
+
+/* 📦 Columnas */
+.left-column,
+.center-column,
+.right-column {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 1.2rem;
+  padding: 1.5rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Columna central (principal) */
+.center-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Caja de información */
+.info-box {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 1rem;
+  border-radius: 0.8rem;
+  text-align: justify;
+}
+
+/* Botones de idiomas */
+.language-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.btn-language {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: none;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.btn-language:hover {
+  transform: translateY(-5px);
+}
+.btn-language.espanol {
+  background-image: url("./Assets/spanish-flag2.png");
+}
+.btn-language.ingles {
+  background-image: url("./Assets/english-flag.jpeg");
+}
+.btn-language.rumano {
+  background-image: url("./Assets/romanian-flag.png");
+}
+
+/* Broadcaster buttons */
+.broadcasters-container {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.btn-broadcaster {
+  background: linear-gradient(45deg, #ff416c, #ff4b2b);
+  color: #fff;
+  border: none;
+  padding: 0.8rem 1.2rem;
+  border-radius: 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+.btn-broadcaster:hover {
+  background: linear-gradient(45deg, #ff4b2b, #ff416c);
+}
+
+/* 🕓 Countdown */
+.countdown-box {
+  margin-top: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  border-radius: 1rem;
+  text-align: center;
+}
+
+/* 🧾 Texto */
+.text-box {
+  text-align: justify;
+  line-height: 1.4;
+  font-size: 0.95rem;
+}
+
+/* 📞 Contacto */
+.contact-box {
+  text-align: center;
+}
+.logo-placeholder {
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  margin: 10px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: #ddd;
+}
+.btn-contact {
+  margin-top: 10px;
+  background: linear-gradient(45deg, #ffd700, #ff9800);
+  color: black;
+  border: none;
+  border-radius: 0.8rem;
+  padding: 0.6rem 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Footer */
+.footer {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+/* 📱 Responsive: una sola columna en móviles */
+@media (max-width: 900px) {
+  .grid-layout {
+    grid-template-columns: 1fr;
+  }
+  .left-column,
+  .center-column,
+  .right-column {
+    width: 100%;
+  }
+}
+
+/* body,
 html {
   margin: 0;
   padding: 0;
   font-family: "Inter", "Roboto", sans-serif;
   height: 100%;
 }
-
-/* .App {
+.App {
   text-align: center;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #b0b0b0, #1e1033);
-  color: #fff;
-  padding: 2rem;
-} */
-.App {
-  text-align: center;
-  min-height: 100vh; /* ocupa al menos toda la pantalla */
-  display: flex;
-  flex-direction: column; /* estructura en columna */
-  align-items: center;
-  justify-content: flex-start; /* ya no centramos todo verticalmente */
+  justify-content: flex-start; 
   background: linear-gradient(135deg, #b0b0b0, #1e1033);
   color: #fff;
   padding: 0rem;
-  box-sizing: border-box; /* para que el padding no desborde */
-}
+  box-sizing: border-box; 
+} */
 
-/* Contenedor central */
-.app-container {
-  flex: 1; /* ocupa todo el espacio disponible */
+/* .app-container {
+  flex: 1; 
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -43,17 +203,15 @@ html {
   width: 100%;
   max-width: 500px;
   box-sizing: border-box;
-}
+} */
 
-/* Titulos grandes */
-h1,
+/* h1,
 h2 {
   font-weight: 800;
   margin: 0;
-}
+} */
 
-/* Botones generales */
-button {
+/* button {
   margin: 5px;
   padding: 1rem 1.5rem;
   font-size: 1.25rem;
@@ -73,10 +231,9 @@ button:hover {
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
+} */
 
-/* Botones por rol */
-.btn-broadcaster {
+/* .btn-broadcaster {
   background-color: #ff416c;
   background-image: linear-gradient(45deg, #ff416c, #ff4b2b);
   color: #fff;
@@ -95,10 +252,9 @@ button:disabled {
 
 .btn-listener:hover {
   background-image: linear-gradient(45deg, #12d8fa, #1fa2ff);
-}
+} */
 
-/* Tarjeta de audio y reproductor */
-.audio-card {
+/* .audio-card {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border-radius: 1.5rem;
@@ -113,16 +269,15 @@ audio {
   outline: none;
 }
 
-/* Botones de idioma y layout */
 .language-buttons {
   display: flex;
   justify-content: center;
   gap: 15px;
   margin-top: 1rem;
-  flex-wrap: nowrap; /* evita que bajen a la siguiente línea */
-}
+  flex-wrap: nowrap; 
+} */
 
-.btn-language {
+/* .btn-language {
   width: 160px;
   height: 160px;
   border-radius: 50%;
@@ -144,10 +299,10 @@ audio {
 .btn-language:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
-}
+} */
 
 /* Idiomas */
-.btn-language.espanol {
+/* .btn-language.espanol {
   background-image: url("./Assets/spanish-flag2.png");
   background-size: 143% 143%;
   background-color: #d32f2f;
@@ -164,20 +319,18 @@ audio {
 }
 
 /* Contenedor de Broadcaster en fila */
-.broadcasters-container {
+/* .broadcasters-container {
   display: flex;
   flex-direction: row;
   gap: 10px;
   justify-content: center;
   margin-bottom: 1rem;
-}
+} */
 
-/* Responsivo */
-@media (max-width: 768px) {
+/* @media (max-width: 768px) {
   .language-buttons {
-    /* flex-direction: column; */
     gap: 15px;
-    flex-direction: row; /* mantener en fila */
+    flex-direction: row; 
   }
 
   .btn-language {
@@ -197,9 +350,9 @@ audio {
     padding: 0.7rem 1rem;
     min-width: 140px;
   }
-}
+} */
 
-@media (max-width: 480px) {
+/* @media (max-width: 480px) {
   button {
     padding: 0.8rem 1rem;
     font-size: 1rem;
@@ -211,18 +364,18 @@ audio {
     font-size: 1.2rem;
   }
   .language-buttons {
-    flex-direction: row; /* mantener en fila */
+    flex-direction: row; 
     gap: 8px;
   }
 
   .btn-language {
-    width: 80px; /* más pequeños para caber */
+    width: 80px; 
     height: 80px;
     font-size: 1rem;
   }
-}
+}  */
 
-/* Nueva sección broadcaster con fondo */
+/* Nueva sección broadcaster con fondo
 .broadcaster-section {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 1.5rem;
@@ -232,7 +385,7 @@ audio {
 }
 
 /* Caja de texto informativo */
-.info-box {
+/* .info-box {
   margin-top: 1rem;
   background: rgba(255, 255, 255, 0.15);
   border-left: 5px solid #1fa2ff;
@@ -241,10 +394,10 @@ audio {
   font-size: 0.99rem;
   text-align: left;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-}
+} */
 
 /* Footer */
-.footer {
+/* .footer {
   padding: 0rem;
   text-align: center;
   font-size: 0.85rem;
@@ -378,4 +531,4 @@ audio {
 .broadcaster-section {
   margin-top: 20px;
   text-align: center;
-}
+}  */
