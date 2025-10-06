@@ -121,52 +121,60 @@ function App() {
   }, []);
 
   // ----------------- UI -----------------
-  if (!ws) {
+  if (!ws)
     return (
-      <p className="text-center mt-10">
-        Conectando al servidor de señalización...
-      </p>
+      <div className="loading-screen">
+        <div className="logo-pulse">⛪</div>
+        <p>Conectando con EBEN-EZER Media...</p>
+      </div>
     );
-  }
+  // if (!ws)
+  //   return (
+  //     <div className="loading-screen">
+  //       <p>
+  //         Conectando
+  //         <span className="dots">
+  //           <span>.</span>
+  //           <span>.</span>
+  //           <span>.</span>
+  //         </span>
+  //       </p>
+  //     </div>
+  //   );
 
   return (
     <div className="App">
-      <header>
-        <h1>TRADUCCIÓN EN VIVO</h1>
-      </header>
-
-      {/* 🧱 Grid principal */}
       <div className="grid-layout">
-        {/* 🟣 COLUMNA IZQUIERDA */}
+        {/* 🟣 IZQUIERDA */}
         <div className="left-column">
           {!user && <Login onLogin={(data) => setUser(data)} />}
 
-          <div className="text-box">
-            <h3>📜 Información general</h3>
+          <div className="text-box small">
+            <h3>ℹ️ Bienvenido</h3>
             <p>
-              Somos la Iglesia EBEN-EZER de Castellón de la Plana. Nuestro
-              objetivo es compartir el mensaje de fe y esperanza en diferentes
-              idiomas. Aquí encontrarás todos los recursos necesarios para
-              conectarte a nuestras transmisiones y participar activamente en la
-              comunidad.
-            </p>
-            <p>
-              Transmitimos en directo cada domingo por la mañana y tarde, y
-              también podrás acceder a eventos especiales y sesiones de oración.
+              Aquí puedes acceder a tu cuenta como traductor o administrador. Si
+              no tienes acceso, por favor contacta con el responsable técnico
+              del servicio.
             </p>
           </div>
 
           <Countdown targetDate={nextEvent} />
         </div>
 
-        {/* 🔵 COLUMNA CENTRAL */}
+        {/* 🔵 CENTRO */}
         <div className="center-column">
+          <h1>TRADUCCIÓN EN VIVO</h1>
+
           <div className="info-box">
             <p>
-              ℹ️ Bienvenido a la sección de traducción simultánea. Aquí podrás
-              escuchar las transmisiones en el idioma que elijas. Nuestras
-              emisiones en directo se realizan los domingos de 10:00 a 12:00 y
-              de 18:00 a 20:00.
+              Transmitimos cada domingo desde Castellón de la Plana en tres
+              idiomas: Español, Inglés y Rumano. Puedes escuchar en directo
+              seleccionando tu idioma preferido a continuación.
+            </p>
+            <p>
+              Nuestro propósito es llevar el mensaje de fe a toda persona,
+              facilitando la comprensión en su lengua materna. Gracias por
+              acompañarnos.
             </p>
           </div>
 
@@ -219,11 +227,11 @@ function App() {
           )}
         </div>
 
-        {/* 🟢 COLUMNA DERECHA */}
+        {/* 🟢 DERECHA */}
         <div className="right-column">
           <div className="contact-box">
             <h3>🏛️ EBEN-EZER Castellón</h3>
-            <div className="logo-placeholder">[ LOGO ]</div>
+            <div className="logo-placeholder">LOGO</div>
             <p>Calle Mayor 123, Castellón de la Plana</p>
             <p>Tel: +34 600 123 456</p>
             <p>Email: contacto@ebenezer.org</p>
@@ -233,7 +241,7 @@ function App() {
         </div>
       </div>
 
-      {/* Contenido dinámico */}
+      {/* STREAMING */}
       {role?.role === "broadcaster" && user?.token && (
         <Broadcaster
           signalingServer={ws}

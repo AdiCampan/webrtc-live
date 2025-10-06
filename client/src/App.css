@@ -1,4 +1,4 @@
-/* Reset básico */
+/* GENERAL */
 body,
 html {
   margin: 0;
@@ -6,35 +6,29 @@ html {
   font-family: "Inter", "Roboto", sans-serif;
   background: linear-gradient(135deg, #b0b0b0, #1e1033);
   color: #fff;
-  min-height: 100vh;
+  height: 100%;
 }
 
-/* Estructura general */
 .App {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  min-height: 100vh;
 }
 
-header h1 {
-  margin: 30px 0;
-  font-size: 2rem;
-  font-weight: 800;
-  color: #fff;
-}
-
-/* 🧱 Grid principal */
+/* GRID */
 .grid-layout {
+  flex: 1;
   display: grid;
-  grid-template-columns: 1fr 2fr 1fr;
+  grid-template-columns: 1fr 1.6fr 1fr; /* laterales más estrechos */
   gap: 25px;
   width: 95%;
   max-width: 1400px;
-  margin-bottom: 40px;
+  margin: auto;
+  box-sizing: border-box;
+  padding-bottom: 80px; /* espacio para el footer sticky */
 }
 
-/* 📦 Columnas */
+/* COLUMNAS */
 .left-column,
 .center-column,
 .right-column {
@@ -42,17 +36,37 @@ header h1 {
   border-radius: 1.2rem;
   padding: 1.5rem;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-}
-
-/* Columna central (principal) */
-.center-column {
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
+  justify-content: flex-start;
+  max-height: calc(100vh - 150px); /* adaptadas a la pantalla */
 }
 
-/* Caja de información */
+/* Login más estrecho */
+.left-column form {
+  max-width: 90%;
+  margin: 0 auto;
+}
+
+/* TÍTULO CENTRAL */
+.center-column h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #fff;
+}
+
+/* CAJAS DE TEXTO */
+.text-box {
+  text-align: justify;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.text-box.small {
+  font-size: 0.9rem;
+}
+
+/* INFO BOX */
 .info-box {
   background: rgba(255, 255, 255, 0.15);
   padding: 1rem;
@@ -60,17 +74,17 @@ header h1 {
   text-align: justify;
 }
 
-/* Botones de idiomas */
+/* BOTONES DE IDIOMA */
 .language-buttons {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 15px;
   flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
-
 .btn-language {
-  width: 120px;
-  height: 120px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   border: none;
   background-size: cover;
@@ -91,7 +105,7 @@ header h1 {
   background-image: url("./Assets/romanian-flag.png");
 }
 
-/* Broadcaster buttons */
+/* BROADCASTER */
 .broadcasters-container {
   display: flex;
   gap: 10px;
@@ -111,23 +125,16 @@ header h1 {
   background: linear-gradient(45deg, #ff4b2b, #ff416c);
 }
 
-/* 🕓 Countdown */
+/* COUNTDOWN */
 .countdown-box {
-  margin-top: 1rem;
+  margin-top: auto;
   background: rgba(0, 0, 0, 0.5);
-  padding: 1rem;
+  padding: 0.8rem;
   border-radius: 1rem;
   text-align: center;
 }
 
-/* 🧾 Texto */
-.text-box {
-  text-align: justify;
-  line-height: 1.4;
-  font-size: 0.95rem;
-}
-
-/* 📞 Contacto */
+/* CONTACTO */
 .contact-box {
   text-align: center;
 }
@@ -140,8 +147,6 @@ header h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
-  color: #ddd;
 }
 .btn-contact {
   margin-top: 10px;
@@ -154,23 +159,66 @@ header h1 {
   cursor: pointer;
 }
 
-/* Footer */
+/* FOOTER STICKY */
 .footer {
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.2);
-  font-size: 0.85rem;
+  position: sticky;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  text-align: center;
+  font-size: 0.8rem;
+  color: #ddd;
+  padding: 0.5rem;
   width: 100%;
 }
 
-/* 📱 Responsive: una sola columna en móviles */
+/* RESPONSIVE */
 @media (max-width: 900px) {
   .grid-layout {
     grid-template-columns: 1fr;
+    gap: 15px;
   }
   .left-column,
   .center-column,
   .right-column {
-    width: 100%;
+    max-height: unset;
+  }
+}
+
+.dots span {
+  animation: blink 1.4s infinite;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.logo-pulse {
+  font-size: 3rem;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
   }
 }
 
