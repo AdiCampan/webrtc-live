@@ -34,7 +34,6 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState(null);
-
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
@@ -159,9 +158,16 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
   };
 
   // Iniciar transmisión
-  const startBroadcast = async () => {
+  const startBroadcast = async (lang) => {
+    const activeLang = lang || selectedLanguage || language;
+
     if (!token) {
       alert("⚠️ No tienes autorización para emitir. Por favor inicia sesión.");
+      return;
+    }
+
+    if (!activeLang) {
+      alert("⚠️ Por favor selecciona un idioma para transmitir.");
       return;
     }
 
@@ -173,6 +179,7 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
             : true,
         });
 
+        // Visualizador de audio
         if (!audioCtxRef.current) {
           const AudioCtx = window.AudioContext || window.webkitAudioContext;
           audioCtxRef.current = new AudioCtx();
@@ -233,9 +240,10 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
       }
     }
 
-    // Registrar Broadcaster con JWT
+    // ✅ Registrar Broadcaster con idioma correcto
+    console.log("📡 Registrando broadcaster en idioma:", activeLang);
     signalingServer.send(
-      JSON.stringify({ type: "broadcaster", language, token })
+      JSON.stringify({ type: "broadcaster", language: activeLang, token })
     );
     setBroadcasting(true);
   };
