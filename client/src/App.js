@@ -151,7 +151,7 @@ function App() {
       <div className="grid-layout">
         {/* COLUMNA IZQUIERDA */}
         <div className="left-column">
-          {!user && (
+          {!user ? (
             <Login
               onLogin={(data) => {
                 setUser(data);
@@ -160,12 +160,26 @@ function App() {
                 }
               }}
             />
+          ) : (
+            <div className="logout-box">
+              <p>
+                Conectado como <strong>{user.role}</strong>
+              </p>
+              <button
+                className="btn-logout"
+                onClick={() => {
+                  setUser(null);
+                  setRole(null);
+                  // Opcional: enviar señal al servidor o cerrar WebRTC si estaba emitiendo
+                  signalingServer.send(
+                    JSON.stringify({ type: "broadcaster-disconnect" })
+                  );
+                }}
+              >
+                Cerrar sesión
+              </button>
+            </div>
           )}
-
-          {/* <div className="text-box small">
-            Aquí va la información extra de la columna izquierda (15 líneas
-            aprox)...
-          </div> */}
           <Countdown targetDate={nextEvent} />
         </div>
 

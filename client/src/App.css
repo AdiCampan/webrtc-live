@@ -56,6 +56,27 @@ html {
   max-width: 80%;
   margin: 0 auto;
 }
+.logout-box {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.btn-logout {
+  margin-top: 10px;
+  background: linear-gradient(45deg, #ff4b2b, #ff416c);
+  color: white;
+  border: none;
+  border-radius: 1rem;
+  padding: 0.6rem 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-logout:hover {
+  background: linear-gradient(45deg, #ff416c, #ff4b2b);
+  transform: translateY(-3px);
+}
 
 /* TÍTULO CENTRAL */
 .center-column h1 {

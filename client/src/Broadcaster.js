@@ -257,168 +257,171 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
 
   return (
     <div className="broadcaster-container">
-      <div>
-        🚀 Emitir en{" "}
-        {language === "es"
-          ? "Español"
-          : language === "en"
-          ? "Inglés"
-          : "Rumano"}
-      </div>
-
-      <div className="mic-selector">
-        <label>🎤 Seleccionar micrófono:</label>
-        <select
-          value={selectedDeviceId || ""}
-          onChange={(e) => setSelectedDeviceId(e.target.value)}
-        >
-          {audioDevices.map((d) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label || d.deviceId}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <button onClick={startBroadcast} disabled={broadcasting}>
-        {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
-      </button>
-
-      {broadcasting && (
+      {!language && !selectedLanguage ? (
         <>
+          <h2>🎙️ Selecciona el idioma que deseas transmitir</h2>
+          <div className="language-buttons">
+            <button
+              className="btn-language espanol"
+              onClick={() => setSelectedLanguage("es")}
+              title="Emitir en Español"
+            />
+            <button
+              className="btn-language ingles"
+              onClick={() => setSelectedLanguage("en")}
+              title="Emitir en Inglés"
+            />
+            <button
+              className="btn-language rumano"
+              onClick={() => setSelectedLanguage("ro")}
+              title="Emitir en Rumano"
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <div>
+            🚀 Emitir en{" "}
+            {selectedLanguage === "es"
+              ? "Español"
+              : selectedLanguage === "en"
+              ? "Inglés"
+              : selectedLanguage === "ro"
+              ? "Rumano"
+              : language === "es"
+              ? "Español"
+              : language === "en"
+              ? "Inglés"
+              : "Rumano"}
+          </div>
+
+          <div className="mic-selector">
+            <label>🎤 Seleccionar micrófono:</label>
+            <select
+              value={selectedDeviceId || ""}
+              onChange={(e) => setSelectedDeviceId(e.target.value)}
+            >
+              {audioDevices.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || d.deviceId}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
-            onClick={() => {
-              if (streamRef.current)
-                streamRef.current.getTracks().forEach((t) => t.stop());
-              streamRef.current = null;
-
-              Object.values(peers.current).forEach((p) => p.close());
-              peers.current = {};
-
-              if (animRef.current) cancelAnimationFrame(animRef.current);
-              if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
-                audioCtxRef.current.close().catch(() => {});
-
-              setBroadcasting(false);
-              if (typeof setRole === "function") setRole(null);
-            }}
+            onClick={() => startBroadcast(selectedLanguage || language)}
+            disabled={broadcasting}
           >
-            🛑 Parar Transmisión
+            {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
           </button>
 
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={200}
-            style={{
-              border: "1px solid black",
-              borderRadius: "15px",
-              marginTop: "10px",
-            }}
-          />
+          {broadcasting && (
+            <>
+              <button
+                onClick={() => {
+                  if (streamRef.current)
+                    streamRef.current.getTracks().forEach((t) => t.stop());
+                  streamRef.current = null;
+
+                  Object.values(peers.current).forEach((p) => p.close());
+                  peers.current = {};
+
+                  if (animRef.current) cancelAnimationFrame(animRef.current);
+                  if (
+                    audioCtxRef.current &&
+                    audioCtxRef.current.state !== "closed"
+                  )
+                    audioCtxRef.current.close().catch(() => {});
+
+                  setBroadcasting(false);
+                  if (typeof setRole === "function") setRole(null);
+                }}
+              >
+                🛑 Parar Transmisión
+              </button>
+
+              <canvas
+                ref={canvasRef}
+                width={600}
+                height={200}
+                style={{
+                  border: "1px solid black",
+                  borderRadius: "15px",
+                  marginTop: "10px",
+                }}
+              />
+            </>
+          )}
         </>
       )}
     </div>
   );
 }
-
 export default Broadcaster;
-
-// import React, { useRef, useEffect, useState } from "react";
-// import "./Broadcaster.css";
-
-// function Broadcaster({ signalingServer }) {
-//   const peers = useRef({});
-//   const streamRef = useRef(null);
-
-//   const [broadcasting, setBroadcasting] = useState(false);
-
-//   useEffect(() => {
-//     const handleMessage = async (event) => {
-//       const data = JSON.parse(event.data);
-
-//       if (data.type === "request-offer") {
-//         if (!streamRef.current) return;
-//         if (!peers.current[data.clientId]) {
-//           await createPeer(data.clientId);
-//         }
-//       }
-
-//       if (data.type === "answer") {
-//         const peer = peers.current[data.clientId];
-//         if (peer) {
-//           await peer.setRemoteDescription(
-//             new RTCSessionDescription(data.answer)
-//           );
-//         }
-//       }
-
-//       if (data.type === "candidate") {
-//         const peer = peers.current[data.clientId];
-//         if (peer) {
-//           await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-//         }
-//       }
-//     };
-
-//     signalingServer.addEventListener("message", handleMessage);
-//     return () => signalingServer.removeEventListener("message", handleMessage);
-//   }, [signalingServer]);
-
-//   const createPeer = async (clientId) => {
-//     const peer = new RTCPeerConnection();
-//     peers.current[clientId] = peer;
-
-//     streamRef.current.getTracks().forEach((track) => {
-//       peer.addTrack(track, streamRef.current);
-//     });
-
-//     peer.onicecandidate = (event) => {
-//       if (event.candidate) {
-//         signalingServer.send(
-//           JSON.stringify({
-//             type: "candidate",
-//             candidate: event.candidate,
-//             target: clientId,
-//           })
-//         );
-//       }
-//     };
-
-//     const offer = await peer.createOffer();
-//     await peer.setLocalDescription(offer);
-
-//     signalingServer.send(
-//       JSON.stringify({ type: "offer", offer, target: clientId })
-//     );
-//   };
-
-//   const startBroadcast = async () => {
-//     if (!streamRef.current) {
-//       try {
-//         streamRef.current = await navigator.mediaDevices.getUserMedia({
-//           audio: true,
-//         });
-//       } catch (err) {
-//         console.error("No se pudo acceder al micrófono", err);
-//         return;
-//       }
-//     }
-//     setBroadcasting(true);
-//   };
 
 //   return (
 //     <div className="broadcaster-container">
-//       <button
-//         onClick={startBroadcast}
-//         disabled={broadcasting}
-//         className="broadcast-btn"
-//       >
+//       <div>
+//         🚀 Emitir en{" "}
+//         {language === "es"
+//           ? "Español"
+//           : language === "en"
+//           ? "Inglés"
+//           : "Rumano"}
+//       </div>
+
+//       <div className="mic-selector">
+//         <label>🎤 Seleccionar micrófono:</label>
+//         <select
+//           value={selectedDeviceId || ""}
+//           onChange={(e) => setSelectedDeviceId(e.target.value)}
+//         >
+//           {audioDevices.map((d) => (
+//             <option key={d.deviceId} value={d.deviceId}>
+//               {d.label || d.deviceId}
+//             </option>
+//           ))}
+//         </select>
+//       </div>
+
+//       <button onClick={startBroadcast} disabled={broadcasting}>
 //         {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
 //       </button>
 
 //       {broadcasting && (
-//         <div className="broadcasting-text">Tu transmisión está activa</div>
+//         <>
+//           <button
+//             onClick={() => {
+//               if (streamRef.current)
+//                 streamRef.current.getTracks().forEach((t) => t.stop());
+//               streamRef.current = null;
+
+//               Object.values(peers.current).forEach((p) => p.close());
+//               peers.current = {};
+
+//               if (animRef.current) cancelAnimationFrame(animRef.current);
+//               if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
+//                 audioCtxRef.current.close().catch(() => {});
+
+//               setBroadcasting(false);
+//               if (typeof setRole === "function") setRole(null);
+//             }}
+//           >
+//             🛑 Parar Transmisión
+//           </button>
+
+//           <canvas
+//             ref={canvasRef}
+//             width={600}
+//             height={200}
+//             style={{
+//               border: "1px solid black",
+//               borderRadius: "15px",
+//               marginTop: "10px",
+//             }}
+//           />
+//         </>
 //       )}
 //     </div>
 //   );
