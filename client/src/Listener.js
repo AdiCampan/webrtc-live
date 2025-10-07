@@ -42,6 +42,12 @@ function Listener({ signalingServer, language, setRole }) {
   useEffect(() => {
     // Crear PeerConnection
     const createPeer = () => {
+      peer.onicegatheringstatechange = () =>
+        console.log("listener iceGathering:", peer.iceGatheringState);
+      peer.oniceconnectionstatechange = () =>
+        console.log("listener iceConnection:", peer.iceConnectionState);
+      peer.onconnectionstatechange = () =>
+        console.log("listener connectionState:", peer.connectionState);
       const peer = new RTCPeerConnection(rtcConfig);
       peerRef.current = peer;
 
@@ -144,6 +150,7 @@ function Listener({ signalingServer, language, setRole }) {
       };
 
       peer.onicecandidate = (event) => {
+        console.log("Local ICE candidate:", e.candidate);
         if (event.candidate) {
           signalingServer.send(
             JSON.stringify({
