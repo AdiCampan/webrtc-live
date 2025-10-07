@@ -5,6 +5,10 @@ import Listener from "./Listener";
 import "./App.css";
 import Countdown from "./Countdown";
 import Login from "./Login";
+import spanishFlag from "./Assets/spanish-flag4.png";
+import englishFlag from "./Assets/english-flag.png";
+import romanianFlag from "./Assets/romanian-flag2.png";
+import logo from "./Assets/logo.png";
 
 function App() {
   const nextEvent = "2025-10-15T12:00:00";
@@ -200,17 +204,23 @@ function App() {
           {!role && (
             <div className="language-buttons">
               <button
-                className="btn-language espanol"
+                className="btn-language"
                 onClick={() => setRole({ role: "listener", language: "es" })}
-              />
+              >
+                <img src={spanishFlag} alt="Español" />
+              </button>
               <button
-                className="btn-language ingles"
+                className="btn-language"
                 onClick={() => setRole({ role: "listener", language: "en" })}
-              />
+              >
+                <img src={englishFlag} alt="Inglés" />
+              </button>
               <button
-                className="btn-language rumano"
+                className="btn-language"
                 onClick={() => setRole({ role: "listener", language: "ro" })}
-              />
+              >
+                <img src={romanianFlag} alt="Rumano" />
+              </button>
             </div>
           )}
 
@@ -240,7 +250,9 @@ function App() {
         {/* COLUMNA DERECHA */}
         <div className="right-column">
           <h2>Información y contacto</h2>
-          <div className="logo-placeholder">Logo</div>
+          <div className="logo-placeholder">
+            <img src={logo} alt="logo" />
+          </div>
           <div className="text-box right">
             Dirección: Calle Ejemplo 123, Ciudad
             <br />

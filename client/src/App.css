@@ -122,30 +122,34 @@ html {
   flex-wrap: wrap;
   margin: 1rem;
 }
+
 .btn-language {
   width: 110px;
   height: 110px;
   border-radius: 50%;
   border: none;
-  background-size: cover;
-  background-position: center;
+  padding: 0;
   cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.2s;
+  background-color: #fff; /* opcional */
 }
+
 .btn-language:hover {
   transform: translateY(-5px);
 }
-.btn-language.espanol {
-  background-image: url("./Assets/spanish-flag2.png");
-}
-.btn-language.ingles {
-  background-image: url("./Assets/english-flag.jpeg");
-}
-.btn-language.rumano {
-  background-image: url("./Assets/romanian-flag.png");
+
+.btn-language img {
+  width: 100%; /* ahora ocupa todo el botón */
+  height: 100%; /* ahora ocupa todo el botón */
+  object-fit: cover; /* mantiene proporción y llena el círculo */
+  display: block;
 }
 
-/* Ajuste para pantallas medianas */
+/* Ajustes responsivos */
 @media (max-width: 900px) {
   .btn-language {
     width: 80px;
@@ -153,10 +157,9 @@ html {
   }
 }
 
-/* Ajuste para pantallas pequeñas */
 @media (max-width: 600px) {
   .language-buttons {
-    gap: 8px; /* menos espacio entre botones */
+    gap: 8px;
   }
   .btn-language {
     width: 60px;
@@ -263,7 +266,16 @@ html {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden; /* clave para que la imagen no sobresalga */
 }
+
+.logo-placeholder img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* recorta la imagen para llenar el círculo */
+  border-radius: 50%; /* asegura que la imagen se vea redonda */
+}
+
 .btn-contact {
   margin-top: 10px;
   background: linear-gradient(45deg, #ffd700, #ff9800);
