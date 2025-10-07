@@ -112,7 +112,11 @@ wss.on("connection", (ws, req) => {
         const targetBroadcaster = broadcasters[data.language];
         if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
           targetBroadcaster.send(
-            JSON.stringify({ type: "request-offer", clientId: ws.id })
+            JSON.stringify({
+              type: "request-offer",
+              clientId: ws.id,
+              language: data.language,
+            })
           );
           console.log(
             `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
