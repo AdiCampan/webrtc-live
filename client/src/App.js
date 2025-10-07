@@ -155,7 +155,7 @@ function App() {
             <Login
               onLogin={(data) => {
                 setUser(data);
-                if (data.username === "admin") {
+                if (data.role === "broadcaster") {
                   setRole({ role: "broadcaster" });
                 }
               }}
@@ -220,7 +220,6 @@ function App() {
             <div className="broadcaster-container">
               <Broadcaster
                 signalingServer={ws}
-                language={role.language}
                 setRole={setRole}
                 token={user.token}
               />
