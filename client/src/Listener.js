@@ -32,10 +32,15 @@ const rtcConfig = {
 function Listener({ signalingServer, language, setRole }) {
   const pcRef = useRef(null);
   const audioRef = useRef(null);
-  const [status, setStatus] = useState("idle"); // idle | requesting | connecting | connected | error
-  const candidateQueueRef = useRef([]); // candidates recibidos antes de tener RTCPeerConnection
+  const canvasRef = useRef(null);
+  const [status, setStatus] = useState("idle");
+  const candidateQueueRef = useRef([]);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const dataArrayRef = useRef(null);
+  const animationRef = useRef(null);
 
-  // Enviar request-offer al servidor (para pedir la offer del broadcaster)
+  // 🔹 Solicita oferta al broadcaster
   const requestOffer = () => {
     if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
       console.warn("WebSocket no disponible para solicitar oferta");
@@ -46,7 +51,59 @@ function Listener({ signalingServer, language, setRole }) {
     setStatus("requesting");
   };
 
-  // Manejo de mensajes entrantes del servidor
+  // 🔹 Dibuja el espectro de audio
+  const drawSpectrum = () => {
+    if (!analyserRef.current || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = dataArrayRef.current;
+
+    const draw = () => {
+      animationRef.current = requestAnimationFrame(draw);
+      analyserRef.current.getByteFrequencyData(dataArray);
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / bufferLength) * 2.5;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = dataArray[i] / 2;
+        ctx.fillStyle = `rgb(${barHeight + 100}, 200, 100)`;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+      }
+    };
+    draw();
+  };
+
+  // 🔹 Configura el audio visualizer una vez que haya audio
+  const setupAudioVisualizer = (stream) => {
+    if (!stream) return;
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext ||
+          window.webkitAudioContext)();
+      }
+      const audioCtx = audioContextRef.current;
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      source.connect(analyser);
+      analyserRef.current = analyser;
+      dataArrayRef.current = dataArray;
+
+      drawSpectrum();
+    } catch (err) {
+      console.warn("No se pudo inicializar visualizador:", err);
+    }
+  };
+
+  // 🔹 Manejo de mensajes WebSocket
   useEffect(() => {
     if (!signalingServer) return;
 
@@ -54,156 +111,94 @@ function Listener({ signalingServer, language, setRole }) {
       let data;
       try {
         data = JSON.parse(event.data);
-      } catch (parseErr) {
-        console.warn("Mensaje no JSON recibido:", event.data);
+      } catch {
         return;
       }
       console.log("📩 Listener recibió:", data);
 
-      try {
-        if (data.type === "offer" && data.offer) {
-          // broadcaster envía offer; data.clientId es el id del broadcaster (target para respuestas)
-          setStatus("connecting");
+      if (data.type === "offer" && data.offer) {
+        setStatus("connecting");
 
-          // Si ya hay un PC anterior, ciérralo primero
-          if (pcRef.current) {
-            try {
-              pcRef.current.close();
-            } catch (_) {}
-            pcRef.current = null;
-          }
-
-          const pc = new RTCPeerConnection(rtcConfig);
-          pcRef.current = pc;
-
-          // Cuando lleguen pistas remotas: asignar al audio element
-          pc.ontrack = (trackEvent) => {
-            try {
-              const remoteStream = trackEvent.streams && trackEvent.streams[0];
-              if (audioRef.current) {
-                audioRef.current.srcObject =
-                  remoteStream ||
-                  new MediaStream(trackEvent.track ? [trackEvent.track] : []);
-                audioRef.current.play().catch(() => {});
-                setStatus("connected");
-              }
-            } catch (err) {
-              console.error("Error en ontrack:", err);
-            }
-          };
-
-          // Enviar candidates locales al broadcaster (target = id del broadcaster)
-          pc.onicecandidate = (iceEvent) => {
-            if (iceEvent.candidate) {
-              if (
-                signalingServer &&
-                signalingServer.readyState === WebSocket.OPEN
-              ) {
-                signalingServer.send(
-                  JSON.stringify({
-                    type: "candidate",
-                    candidate: iceEvent.candidate,
-                    target: data.clientId, // importante: responder al broadcaster
-                  })
-                );
-              }
-            }
-          };
-
-          // Aplicar remoteOffer -> crear Answer y enviarla
+        if (pcRef.current) {
           try {
-            await pc.setRemoteDescription(
-              new RTCSessionDescription(data.offer)
-            );
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
+            pcRef.current.close();
+          } catch {}
+          pcRef.current = null;
+        }
+
+        const pc = new RTCPeerConnection(rtcConfig);
+        pcRef.current = pc;
+
+        pc.ontrack = (ev) => {
+          const stream = ev.streams[0];
+          if (audioRef.current) {
+            audioRef.current.srcObject = stream;
+            audioRef.current.play().catch(() => {});
+          }
+          setupAudioVisualizer(stream);
+          setStatus("connected");
+        };
+
+        pc.onicecandidate = (ev) => {
+          if (ev.candidate) {
             signalingServer.send(
-              JSON.stringify({ type: "answer", answer, target: data.clientId })
+              JSON.stringify({
+                type: "candidate",
+                candidate: ev.candidate,
+                target: data.clientId,
+              })
             );
-            console.log("📤 Answer enviada al Broadcaster:", data.clientId);
-
-            // Si hubo candidates que llegaron antes de crear el pc, añadirlos ahora
-            if (candidateQueueRef.current.length > 0) {
-              for (const queued of candidateQueueRef.current) {
-                try {
-                  await pc.addIceCandidate(new RTCIceCandidate(queued));
-                  console.log("✅ Candidate en cola agregado");
-                } catch (err) {
-                  console.warn("No se pudo agregar candidate en cola:", err);
-                }
-              }
-              candidateQueueRef.current = [];
-            }
-          } catch (errAnswer) {
-            console.error("Error procesando offer/answer:", errAnswer);
-            setStatus("error");
           }
-        }
+        };
 
-        // Cuando recibimos candidate desde el broadcaster
-        if (data.type === "candidate" && data.candidate) {
-          if (pcRef.current) {
-            try {
-              await pcRef.current.addIceCandidate(
-                new RTCIceCandidate(data.candidate)
-              );
-              console.log("✅ Candidate agregado");
-            } catch (err) {
-              console.warn("❌ Error agregando candidate:", err);
-            }
-          } else {
-            // PC no creado todavía: almacenar en cola
-            candidateQueueRef.current.push(data.candidate);
-            console.log("📥 Candidate en cola (esperando pc)");
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          signalingServer.send(
+            JSON.stringify({ type: "answer", answer, target: data.clientId })
+          );
+          console.log("📤 Answer enviada");
+        } catch (err) {
+          console.error("Error procesando offer:", err);
+          setStatus("error");
+        }
+      }
+
+      if (data.type === "candidate" && data.candidate) {
+        if (pcRef.current) {
+          try {
+            await pcRef.current.addIceCandidate(
+              new RTCIceCandidate(data.candidate)
+            );
+          } catch (err) {
+            console.warn("Error agregando candidate:", err);
           }
+        } else {
+          candidateQueueRef.current.push(data.candidate);
         }
-
-        if (data.type === "error") {
-          console.warn("Error del servidor:", data.message);
-        }
-      } catch (err) {
-        console.error("Error manejando mensaje WebSocket en Listener:", err);
       }
     };
 
     signalingServer.addEventListener("message", handleMessage);
-    return () => {
-      signalingServer.removeEventListener("message", handleMessage);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
-  // cuando se monta el componente o cambia el idioma, solicita oferta
+  // 🔹 Solicitar oferta al cargar
   useEffect(() => {
     if (!signalingServer) return;
-    // Si socket ya está abierto, solicitar directamente
-    if (signalingServer.readyState === WebSocket.OPEN) {
-      requestOffer();
-    } else {
-      // si aún no abierto, espera al evento open
-      const onOpen = () => requestOffer();
-      signalingServer.addEventListener("open", onOpen);
-      return () => signalingServer.removeEventListener("open", onOpen);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signalingServer, language]);
-
-  // limpiar al desmontar
-  useEffect(() => {
+    if (signalingServer.readyState === WebSocket.OPEN) requestOffer();
+    else signalingServer.addEventListener("open", requestOffer);
     return () => {
-      if (pcRef.current) {
-        try {
-          pcRef.current.close();
-        } catch (e) {}
-        pcRef.current = null;
-      }
+      signalingServer.removeEventListener("open", requestOffer);
+      cancelAnimationFrame(animationRef.current);
     };
-  }, []);
+  }, [signalingServer, language]);
 
   return (
     <div className="listener-wrapper">
       <h3>
-        🔊 Escuchando:{" "}
+        🎧 Escuchando en{" "}
         {language === "es"
           ? "Español"
           : language === "en"
@@ -211,38 +206,40 @@ function Listener({ signalingServer, language, setRole }) {
           : "Rumano"}
       </h3>
 
-      <div className="listener-controls">
-        <audio ref={audioRef} controls autoPlay />
-      </div>
+      <audio ref={audioRef} controls autoPlay />
 
-      <div className="listener-status">
-        <p>
-          Estado: <strong>{status}</strong>
-        </p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => {
-              setRole(null); /* volver a home para elegir otra cosa */
-            }}
-          >
-            ← Volver
-          </button>
-          <button
-            onClick={() => {
-              // permitir reintentar manualmente
-              if (pcRef.current) {
-                try {
-                  pcRef.current.close();
-                } catch (_) {}
-                pcRef.current = null;
-              }
-              candidateQueueRef.current = [];
-              requestOffer();
-            }}
-          >
-            Reintentar
-          </button>
-        </div>
+      <canvas
+        ref={canvasRef}
+        width={300}
+        height={80}
+        style={{
+          width: "100%",
+          height: "80px",
+          background: "#111",
+          borderRadius: "12px",
+          marginTop: "10px",
+        }}
+      ></canvas>
+
+      <p style={{ marginTop: "8px" }}>Estado: {status}</p>
+
+      <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+        <button onClick={() => setRole(null)}>← Volver</button>
+        <button
+          onClick={() => {
+            if (pcRef.current) {
+              try {
+                pcRef.current.close();
+              } catch {}
+              pcRef.current = null;
+            }
+            cancelAnimationFrame(animationRef.current);
+            candidateQueueRef.current = [];
+            requestOffer();
+          }}
+        >
+          Reintentar 🔄
+        </button>
       </div>
     </div>
   );
