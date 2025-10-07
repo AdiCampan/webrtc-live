@@ -33,6 +33,7 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
   const [broadcasting, setBroadcasting] = useState(false);
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const [selectedLanguage, setSelectedLanguage] = useState(null);
 
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
