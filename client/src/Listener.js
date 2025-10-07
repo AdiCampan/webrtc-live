@@ -150,7 +150,7 @@ function Listener({ signalingServer, language, setRole }) {
       };
 
       peer.onicecandidate = (event) => {
-        console.log("Local ICE candidate:", e.candidate);
+        console.log("Local ICE candidate:", event.candidate);
         if (event.candidate) {
           signalingServer.send(
             JSON.stringify({
