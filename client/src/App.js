@@ -149,7 +149,17 @@ function App() {
       <div className="grid-layout">
         {/* COLUMNA IZQUIERDA */}
         <div className="left-column">
-          {!user && <Login onLogin={(data) => setUser(data)} />}
+          {!user && (
+            <Login
+              onLogin={(data) => {
+                setUser(data);
+                if (data.username === "admin") {
+                  setRole({ role: "broadcaster" });
+                }
+              }}
+            />
+          )}
+
           {/* <div className="text-box small">
             Aquí va la información extra de la columna izquierda (15 líneas
             aprox)...
