@@ -1,5 +1,8 @@
+// src/Listener.js
 import React, { useEffect, useRef, useState } from "react";
+import "./Listener.css"; // si tienes estilos específicos, si no puedes quitar esta línea
 
+// Usa los mismos ICE servers que Broadcaster para mejorar compatibilidad en redes móviles
 const rtcConfig = {
   iceServers: [
     { urls: "stun:stun.relay.metered.ca:80" },
@@ -27,213 +30,180 @@ const rtcConfig = {
 };
 
 function Listener({ signalingServer, language, setRole }) {
-  const peerRef = useRef(null);
-  const broadcasterIdRef = useRef(null); // 🔑 guardamos el ID del broadcaster
+  const pcRef = useRef(null);
   const audioRef = useRef(null);
-  const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState("idle"); // idle | requesting | connecting | connected | error
+  const candidateQueueRef = useRef([]); // candidates recibidos antes de tener RTCPeerConnection
 
-  const canvasRef = useRef(null);
-  const audioCtxRef = useRef(null);
-  const analyserRef = useRef(null);
-  const dataFreqRef = useRef(null);
-  const dataWaveRef = useRef(null);
-  const animRef = useRef(null);
+  // Enviar request-offer al servidor (para pedir la offer del broadcaster)
+  const requestOffer = () => {
+    if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
+      console.warn("WebSocket no disponible para solicitar oferta");
+      return;
+    }
+    signalingServer.send(JSON.stringify({ type: "request-offer", language }));
+    console.log("📡 Listener solicitó oferta para idioma", language);
+    setStatus("requesting");
+  };
 
+  // Manejo de mensajes entrantes del servidor
   useEffect(() => {
-    // Crear PeerConnection
-    const createPeer = () => {
-      peer.onicegatheringstatechange = () =>
-        console.log("listener iceGathering:", peer.iceGatheringState);
-      peer.oniceconnectionstatechange = () =>
-        console.log("listener iceConnection:", peer.iceConnectionState);
-      peer.onconnectionstatechange = () =>
-        console.log("listener connectionState:", peer.connectionState);
-      const peer = new RTCPeerConnection(rtcConfig);
-      peerRef.current = peer;
+    if (!signalingServer) return;
 
-      peer.oniceconnectionstatechange = async () => {
-        const state = peer.iceConnectionState;
-        console.log("🔄 ICE state Listener:", state);
-
-        if (state === "failed" || state === "disconnected") {
-          console.warn("⚠️ ICE falló, intentando restartIce...");
-          try {
-            await peer.restartIce();
-            const offer = await peer.createOffer({ iceRestart: true });
-            await peer.setLocalDescription(offer);
-            signalingServer.send(
-              JSON.stringify({
-                type: "offer",
-                offer,
-                target: broadcasterIdRef.current,
-              })
-            );
-            console.log("🔁 ICE reiniciado con éxito");
-          } catch (err) {
-            console.error("❌ restartIce falló:", err);
-          }
-        }
-      };
-
-      peer.ontrack = (event) => {
-        console.log("🎶 Track recibido en Listener");
-        if (audioRef.current) {
-          audioRef.current.srcObject = event.streams[0];
-          setConnected(true);
-
-          // === Configurar visualizador ===
-          if (!audioCtxRef.current) {
-            try {
-              const AudioCtx = window.AudioContext || window.webkitAudioContext;
-              audioCtxRef.current = new AudioCtx();
-              const analyser = audioCtxRef.current.createAnalyser();
-              analyser.fftSize = 512;
-              analyserRef.current = analyser;
-
-              const src = audioCtxRef.current.createMediaStreamSource(
-                event.streams[0]
-              );
-              src.connect(analyser);
-
-              dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
-              dataWaveRef.current = new Uint8Array(analyser.fftSize);
-
-              const draw = () => {
-                const canvas = canvasRef.current;
-                if (!canvas || !analyserRef.current) return;
-
-                const ctx = canvas.getContext("2d");
-                const width = canvas.width;
-                const height = canvas.height;
-                ctx.clearRect(0, 0, width, height);
-
-                // Waveform
-                analyserRef.current.getByteTimeDomainData(dataWaveRef.current);
-                ctx.lineWidth = 1.5;
-                ctx.strokeStyle = "#00ff99";
-                ctx.beginPath();
-                const slice = width / dataWaveRef.current.length;
-                let x = 0;
-                for (let i = 0; i < dataWaveRef.current.length; i++) {
-                  const v = dataWaveRef.current[i] / 128.0;
-                  const y = (v * height) / 2;
-                  if (i === 0) ctx.moveTo(x, y);
-                  else ctx.lineTo(x, y);
-                  x += slice;
-                }
-                ctx.stroke();
-
-                // Spectrum
-                analyserRef.current.getByteFrequencyData(dataFreqRef.current);
-                const barWidth = 3;
-                for (let i = 0; i < dataFreqRef.current.length; i += 4) {
-                  const barHeight = (dataFreqRef.current[i] / 255) * height;
-                  ctx.fillStyle = "rgba(0,200,255,0.6)";
-                  ctx.fillRect(
-                    (i / 4) * barWidth,
-                    height - barHeight,
-                    barWidth,
-                    barHeight
-                  );
-                }
-
-                animRef.current = requestAnimationFrame(draw);
-              };
-
-              animRef.current = requestAnimationFrame(draw);
-              console.log("🔎 Visualizer Listener iniciado");
-            } catch (err) {
-              console.warn("⚠️ Error iniciando visualizer:", err);
-            }
-          }
-        }
-      };
-
-      peer.onicecandidate = (event) => {
-        console.log("Local ICE candidate:", event.candidate);
-        if (event.candidate) {
-          signalingServer.send(
-            JSON.stringify({
-              type: "candidate",
-              candidate: event.candidate,
-              target: broadcasterIdRef.current,
-            })
-          );
-        }
-      };
-
-      return peer;
-    };
-
-    // Manejar mensajes WebSocket
     const handleMessage = async (event) => {
-      const data = JSON.parse(event.data);
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch (parseErr) {
+        console.warn("Mensaje no JSON recibido:", event.data);
+        return;
+      }
       console.log("📩 Listener recibió:", data);
 
-      if (data.type === "offer") {
-        if (peerRef.current) {
-          peerRef.current.close();
-          peerRef.current = null;
-        }
-        broadcasterIdRef.current = data.clientId; // 🔑 guardar broadcasterId
-        const peer = createPeer();
-        await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await peer.createAnswer();
-        await peer.setLocalDescription(answer);
-        signalingServer.send(
-          JSON.stringify({ type: "answer", answer, target: data.clientId })
-        );
-        console.log("📤 Listener envió answer");
-      }
+      try {
+        if (data.type === "offer" && data.offer) {
+          // broadcaster envía offer; data.clientId es el id del broadcaster (target para respuestas)
+          setStatus("connecting");
 
-      if (data.type === "candidate" && peerRef.current) {
-        try {
-          await peerRef.current.addIceCandidate(
-            new RTCIceCandidate(data.candidate)
-          );
-          console.log("✅ Candidate agregado en Listener");
-        } catch (err) {
-          console.error("❌ Error agregando candidate:", err);
+          // Si ya hay un PC anterior, ciérralo primero
+          if (pcRef.current) {
+            try {
+              pcRef.current.close();
+            } catch (_) {}
+            pcRef.current = null;
+          }
+
+          const pc = new RTCPeerConnection(rtcConfig);
+          pcRef.current = pc;
+
+          // Cuando lleguen pistas remotas: asignar al audio element
+          pc.ontrack = (trackEvent) => {
+            try {
+              const remoteStream = trackEvent.streams && trackEvent.streams[0];
+              if (audioRef.current) {
+                audioRef.current.srcObject =
+                  remoteStream ||
+                  new MediaStream(trackEvent.track ? [trackEvent.track] : []);
+                audioRef.current.play().catch(() => {});
+                setStatus("connected");
+              }
+            } catch (err) {
+              console.error("Error en ontrack:", err);
+            }
+          };
+
+          // Enviar candidates locales al broadcaster (target = id del broadcaster)
+          pc.onicecandidate = (iceEvent) => {
+            if (iceEvent.candidate) {
+              if (
+                signalingServer &&
+                signalingServer.readyState === WebSocket.OPEN
+              ) {
+                signalingServer.send(
+                  JSON.stringify({
+                    type: "candidate",
+                    candidate: iceEvent.candidate,
+                    target: data.clientId, // importante: responder al broadcaster
+                  })
+                );
+              }
+            }
+          };
+
+          // Aplicar remoteOffer -> crear Answer y enviarla
+          try {
+            await pc.setRemoteDescription(
+              new RTCSessionDescription(data.offer)
+            );
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            signalingServer.send(
+              JSON.stringify({ type: "answer", answer, target: data.clientId })
+            );
+            console.log("📤 Answer enviada al Broadcaster:", data.clientId);
+
+            // Si hubo candidates que llegaron antes de crear el pc, añadirlos ahora
+            if (candidateQueueRef.current.length > 0) {
+              for (const queued of candidateQueueRef.current) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(queued));
+                  console.log("✅ Candidate en cola agregado");
+                } catch (err) {
+                  console.warn("No se pudo agregar candidate en cola:", err);
+                }
+              }
+              candidateQueueRef.current = [];
+            }
+          } catch (errAnswer) {
+            console.error("Error procesando offer/answer:", errAnswer);
+            setStatus("error");
+          }
         }
+
+        // Cuando recibimos candidate desde el broadcaster
+        if (data.type === "candidate" && data.candidate) {
+          if (pcRef.current) {
+            try {
+              await pcRef.current.addIceCandidate(
+                new RTCIceCandidate(data.candidate)
+              );
+              console.log("✅ Candidate agregado");
+            } catch (err) {
+              console.warn("❌ Error agregando candidate:", err);
+            }
+          } else {
+            // PC no creado todavía: almacenar en cola
+            candidateQueueRef.current.push(data.candidate);
+            console.log("📥 Candidate en cola (esperando pc)");
+          }
+        }
+
+        if (data.type === "error") {
+          console.warn("Error del servidor:", data.message);
+        }
+      } catch (err) {
+        console.error("Error manejando mensaje WebSocket en Listener:", err);
       }
     };
 
     signalingServer.addEventListener("message", handleMessage);
-
-    // Solicitar oferta al Broadcaster correspondiente
-    const requestOffer = () => {
-      signalingServer.send(JSON.stringify({ type: "request-offer", language }));
-      console.log("📡 Listener solicitó oferta para idioma", language);
+    return () => {
+      signalingServer.removeEventListener("message", handleMessage);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signalingServer]);
 
+  // cuando se monta el componente o cambia el idioma, solicita oferta
+  useEffect(() => {
+    if (!signalingServer) return;
+    // Si socket ya está abierto, solicitar directamente
     if (signalingServer.readyState === WebSocket.OPEN) {
       requestOffer();
     } else {
-      signalingServer.addEventListener("open", requestOffer, { once: true });
+      // si aún no abierto, espera al evento open
+      const onOpen = () => requestOffer();
+      signalingServer.addEventListener("open", onOpen);
+      return () => signalingServer.removeEventListener("open", onOpen);
     }
-
-    // Cleanup
-    return () => {
-      signalingServer.removeEventListener("message", handleMessage);
-      if (peerRef.current) {
-        peerRef.current.close();
-        peerRef.current = null;
-      }
-      broadcasterIdRef.current = null; // 🔑 reset broadcaster al salir
-      setConnected(false);
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-      if (audioRef.current) audioRef.current.srcObject = null;
-      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-        audioCtxRef.current.close().catch(() => {});
-        audioCtxRef.current = null;
-      }
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signalingServer, language]);
 
+  // limpiar al desmontar
+  useEffect(() => {
+    return () => {
+      if (pcRef.current) {
+        try {
+          pcRef.current.close();
+        } catch (e) {}
+        pcRef.current = null;
+      }
+    };
+  }, []);
+
   return (
-    <div>
+    <div className="listener-wrapper">
       <h3>
-        🎧 Audio en{" "}
+        🔊 Escuchando:{" "}
         {language === "es"
           ? "Español"
           : language === "en"
@@ -241,44 +211,38 @@ function Listener({ signalingServer, language, setRole }) {
           : "Rumano"}
       </h3>
 
-      {!connected && <p>Esperando transmisión...</p>}
-      <audio ref={audioRef} autoPlay controls />
+      <div className="listener-controls">
+        <audio ref={audioRef} controls autoPlay />
+      </div>
 
-      <button
-        onClick={() => {
-          if (peerRef.current) {
-            peerRef.current.close();
-            peerRef.current = null;
-          }
-          broadcasterIdRef.current = null; // 🔑 reset también en el botón
-          setConnected(false);
-          if (animRef.current) cancelAnimationFrame(animRef.current);
-          if (audioRef.current) audioRef.current.srcObject = null;
-          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-            audioCtxRef.current.close().catch(() => {});
-            audioCtxRef.current = null;
-          }
-          if (typeof setRole === "function") setRole(null);
-        }}
-      >
-        🔙 Volver
-      </button>
-
-      <canvas
-        ref={canvasRef}
-        width={300}
-        height={100}
-        style={{
-          border: "1px solid #333",
-          margin: "10px",
-          borderRadius: "10px",
-          width: "100%",
-          maxWidth: "400px",
-        }}
-      />
-      <div style={{ marginTop: "10px", fontSize: "14px", color: "gray" }}>
-        Estado de conexión con el transmisor activo. Revisa consola para
-        detalles ICE.
+      <div className="listener-status">
+        <p>
+          Estado: <strong>{status}</strong>
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => {
+              setRole(null); /* volver a home para elegir otra cosa */
+            }}
+          >
+            ← Volver
+          </button>
+          <button
+            onClick={() => {
+              // permitir reintentar manualmente
+              if (pcRef.current) {
+                try {
+                  pcRef.current.close();
+                } catch (_) {}
+                pcRef.current = null;
+              }
+              candidateQueueRef.current = [];
+              requestOffer();
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
     </div>
   );
