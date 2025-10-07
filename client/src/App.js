@@ -170,10 +170,6 @@ function App() {
                 onClick={() => {
                   setUser(null);
                   setRole(null);
-                  // Opcional: enviar señal al servidor o cerrar WebRTC si estaba emitiendo
-                  signalingServer.send(
-                    JSON.stringify({ type: "broadcaster-disconnect" })
-                  );
                 }}
               >
                 Cerrar sesión
