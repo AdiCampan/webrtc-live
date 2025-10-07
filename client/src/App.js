@@ -143,6 +143,8 @@ function App() {
   //       </p>
   //     </div>
   //   );
+  console.log("user:", user);
+  console.log("role:", role);
 
   return (
     <div className="App">
