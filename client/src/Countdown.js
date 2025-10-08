@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import "./App.css"; // o un CSS específico si prefieres
 
-const Countdown = ({ targetDate }) => {
+const Countdown = ({ targetDate, onSetTargetDate, role }) => {
   const calculateTimeLeft = () => {
     const difference = +new Date(targetDate) - +new Date();
     if (difference <= 0) return null;
@@ -102,6 +102,16 @@ const Countdown = ({ targetDate }) => {
       >
         {reminderSet ? "🔔 Recordatorio activado" : "🔔 Recordar"}
       </button>
+      {role === "broadcaster" && (
+        <div className="set-next-event">
+          <h3>📅 Programar próxima emisión</h3>
+          <input
+            type="datetime-local"
+            value={new Date(targetDate).toISOString().slice(0, 16)}
+            onChange={(e) => onSetTargetDate(e.target.value)}
+          />
+        </div>
+      )}
     </div>
   );
 };

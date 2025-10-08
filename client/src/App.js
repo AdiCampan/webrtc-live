@@ -11,14 +11,13 @@ import romanianFlag from "./Assets/romanian-flag2.png";
 import logo from "./Assets/logo.png";
 
 function App() {
-  const nextEvent = "2025-10-15T12:00:00";
-
   // WebSocket
   const [ws, setWs] = useState(null);
   const wsRef = useRef(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
+  const [nextEvent, setNextEvent] = useState("2025-10-15T12:00:00");
 
   // Usuario logueado (admin)
   const [user, setUser] = useState(null);
@@ -180,7 +179,11 @@ function App() {
               </button>
             </div>
           )}
-          <Countdown targetDate={nextEvent} />
+          <Countdown
+            targetDate={nextEvent}
+            onSetTargetDate={setNextEvent}
+            role={role?.role}
+          />
         </div>
 
         <div className="center-column">
