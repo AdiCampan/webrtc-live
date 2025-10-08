@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
+import fs from "fs";
 
 // 🔹 Definir __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -170,7 +171,18 @@ wss.on("connection", (ws, req) => {
     }
   });
 });
-let nextEventDate = "2025-10-15T12:00:00"; // valor por defecto
+const EVENT_FILE = "./nextEvent.json";
+let nextEventDate = "2025-10-15T12:00:00";
+
+// Leer fecha guardada al iniciar el servidor
+try {
+  if (fs.existsSync(EVENT_FILE)) {
+    const saved = JSON.parse(fs.readFileSync(EVENT_FILE, "utf-8"));
+    if (saved.date) nextEventDate = saved.date;
+  }
+} catch (err) {
+  console.error("⚠️ No se pudo leer el archivo de evento:", err);
+}
 
 app.get("/next-event", (req, res) => {
   res.json({ date: nextEventDate });
@@ -183,6 +195,8 @@ app.post("/next-event", (req, res) => {
     return res.status(403).json({ error: "No autorizado" });
   }
   nextEventDate = date;
+  fs.writeFileSync(EVENT_FILE, JSON.stringify({ date }, null, 2));
+
   console.log("📅 Nueva fecha de evento:", date);
   res.json({ success: true, date });
 });

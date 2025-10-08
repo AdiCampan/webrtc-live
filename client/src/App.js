@@ -17,7 +17,14 @@ function App() {
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
-  const [nextEvent, setNextEvent] = useState("2025-10-15T12:00:00");
+  const [nextEvent, setNextEvent] = useState(null);
+
+  useEffect(() => {
+    fetch("/next-event")
+      .then((res) => res.json())
+      .then((data) => setNextEvent(data.date))
+      .catch((err) => console.error("Error al obtener la fecha:", err));
+  }, []);
 
   useEffect(() => {
     fetch("/next-event")
