@@ -70,11 +70,11 @@ const Countdown = ({ targetDate, onSetTargetDate, role }) => {
   if (!timeLeft) {
     return (
       <div className="countdown-box">
-        <button className="close-btn" onClick={() => setVisible(false)}>
+        {/* <button className="close-btn" onClick={() => setVisible(false)}>
           ✖
-        </button>
-        <h2>⏰ Próxima emisión</h2>
+        </button> */}
         <p>¡Ya comenzó!</p>
+        <h2>⏰ Próxima emisión</h2>
       </div>
     );
   }

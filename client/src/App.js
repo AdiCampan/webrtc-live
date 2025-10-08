@@ -19,6 +19,23 @@ function App() {
   const keepaliveIntervalRef = useRef(null);
   const [nextEvent, setNextEvent] = useState("2025-10-15T12:00:00");
 
+  useEffect(() => {
+    fetch("/next-event")
+      .then((res) => res.json())
+      .then((data) => setNextEvent(data.date));
+  }, []);
+
+  const handleSetNextEvent = async (newDate) => {
+    setNextEvent(newDate);
+    if (user?.token) {
+      await fetch("/next-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: newDate, token: user.token }),
+      });
+    }
+  };
+
   // Usuario logueado (admin)
   const [user, setUser] = useState(null);
 
@@ -181,7 +198,7 @@ function App() {
           )}
           <Countdown
             targetDate={nextEvent}
-            onSetTargetDate={setNextEvent}
+            onSetTargetDate={handleSetNextEvent}
             role={role?.role}
           />
         </div>

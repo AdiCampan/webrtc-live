@@ -170,6 +170,22 @@ wss.on("connection", (ws, req) => {
     }
   });
 });
+let nextEventDate = "2025-10-15T12:00:00"; // valor por defecto
+
+app.get("/next-event", (req, res) => {
+  res.json({ date: nextEventDate });
+});
+
+app.post("/next-event", (req, res) => {
+  const { date, token } = req.body;
+  const decoded = verifyToken(token);
+  if (!decoded || decoded.role !== "broadcaster") {
+    return res.status(403).json({ error: "No autorizado" });
+  }
+  nextEventDate = date;
+  console.log("📅 Nueva fecha de evento:", date);
+  res.json({ success: true, date });
+});
 
 // import express from "express";
 // import { WebSocketServer } from "ws";
