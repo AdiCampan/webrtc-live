@@ -70,14 +70,33 @@ const Countdown = ({ targetDate, onSetTargetDate, role }) => {
   if (!timeLeft) {
     return (
       <div className="countdown-box">
-        {/* <button className="close-btn" onClick={() => setVisible(false)}>
-          ✖
-        </button> */}
-        <p>¡Ya comenzó!</p>
         <h2>⏰ Próxima emisión</h2>
+        <p>¡Ya comenzó o terminó el evento!</p>
+
+        {role === "broadcaster" && (
+          <div className="set-next-event">
+            <h3>📅 Programar próxima emisión</h3>
+            <input
+              type="datetime-local"
+              value={
+                targetDate
+                  ? new Date(targetDate).toISOString().slice(0, 16)
+                  : ""
+              }
+              onChange={(e) => onSetTargetDate(e.target.value)}
+            />
+          </div>
+        )}
       </div>
     );
   }
+
+  const formatLocalDateTime = (dateString) => {
+    const date = new Date(dateString);
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60000);
+    return localDate.toISOString().slice(0, 16);
+  };
 
   return (
     <div className="countdown-box">
@@ -107,7 +126,7 @@ const Countdown = ({ targetDate, onSetTargetDate, role }) => {
           <h3>📅 Programar próxima emisión</h3>
           <input
             type="datetime-local"
-            value={new Date(targetDate).toISOString().slice(0, 16)}
+            value={targetDate ? formatLocalDateTime(targetDate) : ""}
             onChange={(e) => onSetTargetDate(e.target.value)}
           />
         </div>
