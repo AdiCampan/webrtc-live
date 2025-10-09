@@ -7,9 +7,6 @@ import jwt from "jsonwebtoken";
 import fs from "fs";
 import dotenv from "dotenv";
 
-import dotenv from "dotenv";
-dotenv.config();
-
 dotenv.config();
 
 // 🔹 Definir __dirname en ES Modules
