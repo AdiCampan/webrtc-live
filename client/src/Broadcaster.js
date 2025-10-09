@@ -4,28 +4,32 @@ import "./Broadcaster.css";
 // 🔹 Configuración ICE desde variables de entorno
 const rtcConfig = {
   iceServers: [
-    { urls: process.env.REACT_APP_STUN_URL },
-    {
+    process.env.REACT_APP_STUN_URL && { urls: process.env.REACT_APP_STUN_URL },
+
+    process.env.REACT_APP_TURN_URL && {
       urls: process.env.REACT_APP_TURN_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-    {
+
+    process.env.REACT_APP_TURN_TCP_URL && {
       urls: process.env.REACT_APP_TURN_TCP_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-    {
+
+    process.env.REACT_APP_TURN_443_URL && {
       urls: process.env.REACT_APP_TURN_443_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-    {
+
+    process.env.REACT_APP_TURNS_443_TCP_URL && {
       urls: process.env.REACT_APP_TURNS_443_TCP_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-  ],
+  ].filter(Boolean), // 👈 elimina las entradas undefined automáticamente
 };
 
 function Broadcaster({ signalingServer, language, token, setRole }) {

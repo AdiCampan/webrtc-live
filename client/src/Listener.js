@@ -5,34 +5,32 @@ import "./Listener.css";
 // 🔹 Usa los mismos ICE servers que Broadcaster para mejorar compatibilidad en redes móviles
 const rtcConfig = {
   iceServers: [
-    { urls: process.env.REACT_APP_STUN_URL || "stun:stun.relay.metered.ca:80" },
-    {
-      urls:
-        process.env.REACT_APP_TURN_URL || "turn:standard.relay.metered.ca:80",
+    process.env.REACT_APP_STUN_URL && { urls: process.env.REACT_APP_STUN_URL },
+
+    process.env.REACT_APP_TURN_URL && {
+      urls: process.env.REACT_APP_TURN_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-    {
-      urls:
-        process.env.REACT_APP_TURN_URL ||
-        "turn:standard.relay.metered.ca:80?transport=tcp",
+
+    process.env.REACT_APP_TURN_TCP_URL && {
+      urls: process.env.REACT_APP_TURN_TCP_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-    {
-      urls:
-        process.env.REACT_APP_TURN_URL || "turn:standard.relay.metered.ca:443",
+
+    process.env.REACT_APP_TURN_443_URL && {
+      urls: process.env.REACT_APP_TURN_443_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-    {
-      urls:
-        process.env.REACT_APP_TURN_URL ||
-        "turns:standard.relay.metered.ca:443?transport=tcp",
+
+    process.env.REACT_APP_TURNS_443_TCP_URL && {
+      urls: process.env.REACT_APP_TURNS_443_TCP_URL,
       username: process.env.REACT_APP_TURN_USERNAME,
       credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
-  ],
+  ].filter(Boolean), // 👈 elimina las entradas undefined automáticamente
 };
 
 function Listener({ signalingServer, language, setRole }) {
