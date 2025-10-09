@@ -12,7 +12,7 @@ function Login({ onLogin }) {
     try {
       const apiUrl = process.env.REACT_APP_API_URL;
 
-      const res = await fetch(`${apiUrl}/login`, {
+      const res = await fetch("/next-event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
