@@ -205,7 +205,7 @@ function App() {
         </div>
 
         <div className="center-column">
-          <h1>TRADUCCIÓN EN VIVO</h1>
+          <h1 class="live-title">TRADUCCIÓN EN VIVO</h1>
 
           {/* Caja de texto central */}
           <div className="info-box">
@@ -224,24 +224,35 @@ function App() {
           {/* Botones de escuchar solo si no se ha seleccionado rol */}
           {!role && (
             <div className="language-buttons">
-              <button
-                className="btn-language"
-                onClick={() => setRole({ role: "listener", language: "es" })}
-              >
-                <img src={spanishFlag} alt="Español" />
-              </button>
-              <button
-                className="btn-language"
-                onClick={() => setRole({ role: "listener", language: "en" })}
-              >
-                <img src={englishFlag} alt="Inglés" />
-              </button>
-              <button
-                className="btn-language"
-                onClick={() => setRole({ role: "listener", language: "ro" })}
-              >
-                <img src={romanianFlag} alt="Rumano" />
-              </button>
+              <div className="language-option">
+                <button
+                  className="btn-language"
+                  onClick={() => setRole({ role: "listener", language: "es" })}
+                >
+                  <img src={spanishFlag} alt="Español" />
+                </button>
+                <span className="btn-label">Escucha</span>
+              </div>
+
+              <div className="language-option">
+                <button
+                  className="btn-language"
+                  onClick={() => setRole({ role: "listener", language: "en" })}
+                >
+                  <img src={englishFlag} alt="Inglés" />
+                </button>
+                <span className="btn-label">Listen</span>
+              </div>
+
+              <div className="language-option">
+                <button
+                  className="btn-language"
+                  onClick={() => setRole({ role: "listener", language: "ro" })}
+                >
+                  <img src={romanianFlag} alt="Rumano" />
+                </button>
+                <span className="btn-label">Ascultă</span>
+              </div>
             </div>
           )}
 

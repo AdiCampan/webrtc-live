@@ -81,8 +81,18 @@ html {
 /* TÍTULO CENTRAL */
 .center-column h1 {
   font-size: 2rem;
-  margin-bottom: 1rem;
+  /* margin-bottom: 1rem; */
   color: #fff;
+}
+.live-title {
+  font-family: "Montserrat", sans-serif;
+  font-size: 3rem;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 0 5px #ff4d6d, 0 0 10px #ff4d6d, 0 0 20px #ff4d6d,
+    0 0 40px #ff4d6d;
+  margin: 0rem;
 }
 
 /* CAJAS DE TEXTO */
@@ -114,13 +124,19 @@ html {
   text-align: justify;
 }
 
-/* BOTONES DE IDIOMA */
+/* CONTENEDOR DE BOTONES */
 .language-buttons {
   display: flex;
   justify-content: center;
-  gap: 15px;
+  gap: 25px;
   flex-wrap: wrap;
-  margin: 1rem;
+  margin: 1.5rem 0;
+}
+
+.language-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .btn-language {
@@ -128,25 +144,34 @@ html {
   height: 110px;
   border-radius: 50%;
   border: none;
-  padding: 0;
-  cursor: pointer;
   overflow: hidden;
+  background-color: #fff;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s;
-  background-color: #fff; /* opcional */
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.35);
 }
 
 .btn-language:hover {
   transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.45);
 }
 
 .btn-language img {
-  width: 100%; /* ahora ocupa todo el botón */
-  height: 100%; /* ahora ocupa todo el botón */
-  object-fit: cover; /* mantiene proporción y llena el círculo */
-  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.btn-label {
+  margin-top: 8px;
+  font-weight: 600;
+  text-align: center;
+  font-size: 14px;
+  color: #f0eeee;
 }
 
 /* Ajustes responsivos */
