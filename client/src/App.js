@@ -47,10 +47,12 @@ function App() {
   const [role, setRole] = useState(null);
 
   // URL WebSocket
-  const signalingUrl = (() => {
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    return `${protocol}://${window.location.host}`;
-  })();
+  // const signalingUrl = (() => {
+  //   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  //   return `${protocol}://${window.location.host}`;
+  // })();
+
+  const signalingUrl = process.env.REACT_APP_API_URL.replace(/^http/, "ws"); // para pruebas locales
 
   // const signalingUrl = "ws://localhost:8080"; // para pruebas locales
 
@@ -208,7 +210,7 @@ function App() {
         </div>
 
         <div className="center-column">
-          <h1 class="live-title">TRADUCCIÓN EN VIVO</h1>
+          <h1 className="live-title">TRADUCCIÓN EN VIVO</h1>
 
           {/* Caja de texto central */}
           <div className="info-box">

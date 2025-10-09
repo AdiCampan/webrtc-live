@@ -247,9 +247,22 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
 
     // ✅ Registrar Broadcaster con idioma correcto
     console.log("📡 Registrando broadcaster en idioma:", activeLang);
-    signalingServer.send(
-      JSON.stringify({ type: "broadcaster", language: activeLang, token })
-    );
+    if (signalingServer.readyState === WebSocket.OPEN) {
+      signalingServer.send(
+        JSON.stringify({ type: "broadcaster", language: activeLang, token })
+      );
+    } else {
+      signalingServer.addEventListener(
+        "open",
+        () => {
+          signalingServer.send(
+            JSON.stringify({ type: "broadcaster", language: activeLang, token })
+          );
+        },
+        { once: true }
+      );
+    }
+
     setBroadcasting(true);
   };
 
@@ -374,72 +387,3 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
 }
 
 export default Broadcaster;
-
-//   return (
-//     <div className="broadcaster-container">
-//       <div>
-//         🚀 Emitir en{" "}
-//         {language === "es"
-//           ? "Español"
-//           : language === "en"
-//           ? "Inglés"
-//           : "Rumano"}
-//       </div>
-
-//       <div className="mic-selector">
-//         <label>🎤 Seleccionar micrófono:</label>
-//         <select
-//           value={selectedDeviceId || ""}
-//           onChange={(e) => setSelectedDeviceId(e.target.value)}
-//         >
-//           {audioDevices.map((d) => (
-//             <option key={d.deviceId} value={d.deviceId}>
-//               {d.label || d.deviceId}
-//             </option>
-//           ))}
-//         </select>
-//       </div>
-
-//       <button onClick={startBroadcast} disabled={broadcasting}>
-//         {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
-//       </button>
-
-//       {broadcasting && (
-//         <>
-//           <button
-//             onClick={() => {
-//               if (streamRef.current)
-//                 streamRef.current.getTracks().forEach((t) => t.stop());
-//               streamRef.current = null;
-
-//               Object.values(peers.current).forEach((p) => p.close());
-//               peers.current = {};
-
-//               if (animRef.current) cancelAnimationFrame(animRef.current);
-//               if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
-//                 audioCtxRef.current.close().catch(() => {});
-
-//               setBroadcasting(false);
-//               if (typeof setRole === "function") setRole(null);
-//             }}
-//           >
-//             🛑 Parar Transmisión
-//           </button>
-
-//           <canvas
-//             ref={canvasRef}
-//             width={600}
-//             height={200}
-//             style={{
-//               border: "1px solid black",
-//               borderRadius: "15px",
-//               marginTop: "10px",
-//             }}
-//           />
-//         </>
-//       )}
-//     </div>
-//   );
-// }
-
-// export default Broadcaster;
