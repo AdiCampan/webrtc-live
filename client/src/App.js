@@ -22,7 +22,7 @@ function App() {
   const apiUrl = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
-    fetch(`${apiUrl}/next-event`) // ✅ aquí usamos la URL completa
+    fetch("/next-event") // ✅ aquí usamos la URL completa
       .then((res) => res.json())
       .then((data) => setNextEvent(data.date))
       .catch((err) => console.error("Error al obtener la fecha:", err));
@@ -31,7 +31,7 @@ function App() {
   const handleSetNextEvent = async (newDate) => {
     setNextEvent(newDate);
     if (user?.token) {
-      await fetch(`${apiUrl}/next-event`, {
+      await fetch("/next-event", {
         // ✅ aquí también
         method: "POST",
         headers: { "Content-Type": "application/json" },
