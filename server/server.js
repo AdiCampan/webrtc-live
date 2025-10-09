@@ -18,6 +18,7 @@ const PORT = process.env.PORT || 8080;
 const SECRET_KEY = process.env.SECRET_KEY;
 
 // Middleware JSON
+app.use(cors());
 app.use(express.json());
 
 const users = [
@@ -32,6 +33,7 @@ const users = [
 // 🟢 ENDPOINTS API (van ANTES de servir el frontend)
 // =====================================================
 
+app.use(express.json());
 // Endpoint login
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
