@@ -20,10 +20,12 @@ const SECRET_KEY = process.env.SECRET_KEY;
 // Middleware JSON
 app.use(express.json());
 
-// Usuarios de ejemplo
 const users = [
-  { username: "admin", password: "super123", role: "broadcaster" },
-  // Puedes agregar más usuarios si quieres
+  {
+    username: process.env.ADMIN_USERNAME,
+    password: process.env.ADMIN_PASSWORD,
+    role: "broadcaster",
+  },
 ];
 
 // =====================================================
