@@ -23,6 +23,10 @@ const users = [
   // Puedes agregar más usuarios si quieres
 ];
 
+// =====================================================
+// 🟢 ENDPOINTS API (van ANTES de servir el frontend)
+// =====================================================
+
 // Endpoint login
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
@@ -50,19 +54,58 @@ const verifyToken = (token) => {
   }
 };
 
-// Servir React build
+// =====================================================
+// 📅 Manejo de Next Event con persistencia en archivo
+// =====================================================
+const EVENT_FILE = "./nextEvent.json";
+let nextEventDate = "2025-10-15T12:00:00";
+
+// Leer fecha guardada al iniciar el servidor
+try {
+  if (fs.existsSync(EVENT_FILE)) {
+    const saved = JSON.parse(fs.readFileSync(EVENT_FILE, "utf-8"));
+    if (saved.date) nextEventDate = saved.date;
+  }
+} catch (err) {
+  console.error("⚠️ No se pudo leer el archivo de evento:", err);
+}
+
+// Obtener fecha actual del evento
+app.get("/next-event", (req, res) => {
+  res.json({ date: nextEventDate });
+});
+
+// Actualizar fecha del evento (solo broadcaster autorizado)
+app.post("/next-event", (req, res) => {
+  const { date, token } = req.body;
+  const decoded = verifyToken(token);
+  if (!decoded || decoded.role !== "broadcaster") {
+    return res.status(403).json({ error: "No autorizado" });
+  }
+
+  nextEventDate = date;
+  fs.writeFileSync(EVENT_FILE, JSON.stringify({ date }, null, 2));
+
+  console.log("📅 Nueva fecha de evento:", date);
+  res.json({ success: true, date });
+});
+
+// =====================================================
+// 🎨 Servir el frontend de React (DESPUÉS de las APIs)
+// =====================================================
 const clientBuildPath = path.join(__dirname, "../client/build");
 app.use(express.static(clientBuildPath));
 app.get("/*", (req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
-// Iniciar servidor HTTP
+// =====================================================
+// 🌐 WebSocket Server
+// =====================================================
 const server = app.listen(PORT, () => {
   console.log(`Servidor HTTP + WebSocket escuchando en puerto ${PORT}`);
 });
 
-// WebSocket
 const wss = new WebSocketServer({ server });
 
 // Mapa de Broadcasters por idioma
@@ -170,35 +213,6 @@ wss.on("connection", (ws, req) => {
       console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
     }
   });
-});
-const EVENT_FILE = "./nextEvent.json";
-let nextEventDate = "2025-10-15T12:00:00";
-
-// Leer fecha guardada al iniciar el servidor
-try {
-  if (fs.existsSync(EVENT_FILE)) {
-    const saved = JSON.parse(fs.readFileSync(EVENT_FILE, "utf-8"));
-    if (saved.date) nextEventDate = saved.date;
-  }
-} catch (err) {
-  console.error("⚠️ No se pudo leer el archivo de evento:", err);
-}
-
-app.get("/next-event", (req, res) => {
-  res.json({ date: nextEventDate });
-});
-
-app.post("/next-event", (req, res) => {
-  const { date, token } = req.body;
-  const decoded = verifyToken(token);
-  if (!decoded || decoded.role !== "broadcaster") {
-    return res.status(403).json({ error: "No autorizado" });
-  }
-  nextEventDate = date;
-  fs.writeFileSync(EVENT_FILE, JSON.stringify({ date }, null, 2));
-
-  console.log("📅 Nueva fecha de evento:", date);
-  res.json({ success: true, date });
 });
 
 // import express from "express";

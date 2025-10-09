@@ -26,12 +26,6 @@ function App() {
       .catch((err) => console.error("Error al obtener la fecha:", err));
   }, []);
 
-  useEffect(() => {
-    fetch("/next-event")
-      .then((res) => res.json())
-      .then((data) => setNextEvent(data.date));
-  }, []);
-
   const handleSetNextEvent = async (newDate) => {
     setNextEvent(newDate);
     if (user?.token) {
