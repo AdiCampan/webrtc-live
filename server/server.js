@@ -1,3 +1,4 @@
+// server.js
 import express from "express";
 import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
@@ -6,6 +7,7 @@ import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
 import fs from "fs";
 import dotenv from "dotenv";
+import cors from "cors";
 
 dotenv.config();
 
@@ -17,10 +19,11 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const SECRET_KEY = process.env.SECRET_KEY;
 
-// Middleware JSON
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Usuarios administradores desde .env
 const users = [
   {
     username: process.env.ADMIN_USERNAME,
@@ -30,13 +33,13 @@ const users = [
 ];
 
 // =====================================================
-// 🟢 ENDPOINTS API (van ANTES de servir el frontend)
+// 🟢 ENDPOINTS API (ANTES de servir el frontend)
 // =====================================================
 
-app.use(express.json());
 // Endpoint login
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
+
   const user = users.find(
     (u) => u.username === username && u.password === password
   );
@@ -52,7 +55,7 @@ app.post("/login", (req, res) => {
   res.json({ token, role: user.role });
 });
 
-// Middleware para verificar JWT en WebSocket
+// Middleware para verificar JWT
 const verifyToken = (token) => {
   try {
     return jwt.verify(token, SECRET_KEY);
@@ -67,7 +70,6 @@ const verifyToken = (token) => {
 const EVENT_FILE = "./nextEvent.json";
 let nextEventDate = "2025-10-15T12:00:00";
 
-// Leer fecha guardada al iniciar el servidor
 try {
   if (fs.existsSync(EVENT_FILE)) {
     const saved = JSON.parse(fs.readFileSync(EVENT_FILE, "utf-8"));
@@ -92,7 +94,6 @@ app.post("/next-event", (req, res) => {
 
   nextEventDate = date;
   fs.writeFileSync(EVENT_FILE, JSON.stringify({ date }, null, 2));
-
   console.log("📅 Nueva fecha de evento:", date);
   res.json({ success: true, date });
 });
