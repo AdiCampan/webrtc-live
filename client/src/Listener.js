@@ -1,30 +1,36 @@
 // src/Listener.js
 import React, { useEffect, useRef, useState } from "react";
-import "./Listener.css"; // si tienes estilos específicos, si no puedes quitar esta línea
+import "./Listener.css";
 
-// Usa los mismos ICE servers que Broadcaster para mejorar compatibilidad en redes móviles
+// 🔹 Usa los mismos ICE servers que Broadcaster para mejorar compatibilidad en redes móviles
 const rtcConfig = {
   iceServers: [
-    { urls: "stun:stun.relay.metered.ca:80" },
+    { urls: process.env.REACT_APP_STUN_URL || "stun:stun.relay.metered.ca:80" },
     {
-      urls: "turn:standard.relay.metered.ca:80",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls:
+        process.env.REACT_APP_TURN_URL || "turn:standard.relay.metered.ca:80",
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
     {
-      urls: "turn:standard.relay.metered.ca:80?transport=tcp",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls:
+        process.env.REACT_APP_TURN_URL ||
+        "turn:standard.relay.metered.ca:80?transport=tcp",
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
     {
-      urls: "turn:standard.relay.metered.ca:443",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls:
+        process.env.REACT_APP_TURN_URL || "turn:standard.relay.metered.ca:443",
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
     {
-      urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls:
+        process.env.REACT_APP_TURN_URL ||
+        "turns:standard.relay.metered.ca:443?transport=tcp",
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
   ],
 };
@@ -40,7 +46,6 @@ function Listener({ signalingServer, language, setRole }) {
   const dataArrayRef = useRef(null);
   const animationRef = useRef(null);
 
-  // 🔹 Solicita oferta al broadcaster
   const requestOffer = () => {
     if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
       console.warn("WebSocket no disponible para solicitar oferta");
@@ -51,7 +56,6 @@ function Listener({ signalingServer, language, setRole }) {
     setStatus("requesting");
   };
 
-  // 🔹 Dibuja el espectro de audio
   const drawSpectrum = () => {
     if (!analyserRef.current || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -78,7 +82,6 @@ function Listener({ signalingServer, language, setRole }) {
     draw();
   };
 
-  // 🔹 Configura el audio visualizer una vez que haya audio
   const setupAudioVisualizer = (stream) => {
     if (!stream) return;
     try {
@@ -103,7 +106,6 @@ function Listener({ signalingServer, language, setRole }) {
     }
   };
 
-  // 🔹 Manejo de mensajes WebSocket
   useEffect(() => {
     if (!signalingServer) return;
 
@@ -153,6 +155,17 @@ function Listener({ signalingServer, language, setRole }) {
 
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+          // Procesar candidatos en cola
+          candidateQueueRef.current.forEach((c) => {
+            pcRef.current
+              .addIceCandidate(new RTCIceCandidate(c))
+              .catch((err) => {
+                console.warn("Error agregando candidate de cola:", err);
+              });
+          });
+          candidateQueueRef.current = [];
+
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           signalingServer.send(
@@ -184,7 +197,6 @@ function Listener({ signalingServer, language, setRole }) {
     return () => signalingServer.removeEventListener("message", handleMessage);
   }, [signalingServer]);
 
-  // 🔹 Solicitar oferta al cargar
   useEffect(() => {
     if (!signalingServer) return;
     if (signalingServer.readyState === WebSocket.OPEN) requestOffer();
@@ -192,6 +204,8 @@ function Listener({ signalingServer, language, setRole }) {
     return () => {
       signalingServer.removeEventListener("open", requestOffer);
       cancelAnimationFrame(animationRef.current);
+      audioContextRef.current?.close();
+      audioContextRef.current = null;
     };
   }, [signalingServer, language]);
 

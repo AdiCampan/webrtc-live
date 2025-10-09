@@ -5,6 +5,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
 import fs from "fs";
+import dotenv from "dotenv";
+
+import dotenv from "dotenv";
+dotenv.config();
+
+dotenv.config();
 
 // 🔹 Definir __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -12,7 +18,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const SECRET_KEY = "SUPER_SECRETO_123"; // Cambiar en producción
+const SECRET_KEY = process.env.SECRET_KEY;
 
 // Middleware JSON
 app.use(express.json());

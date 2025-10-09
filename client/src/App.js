@@ -18,9 +18,11 @@ function App() {
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
   const [nextEvent, setNextEvent] = useState(null);
+  // Obtén la URL del backend desde la variable de entorno
+  const apiUrl = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
-    fetch("/next-event")
+    fetch(`${apiUrl}/next-event`) // ✅ aquí usamos la URL completa
       .then((res) => res.json())
       .then((data) => setNextEvent(data.date))
       .catch((err) => console.error("Error al obtener la fecha:", err));
@@ -29,7 +31,8 @@ function App() {
   const handleSetNextEvent = async (newDate) => {
     setNextEvent(newDate);
     if (user?.token) {
-      await fetch("/next-event", {
+      await fetch(`${apiUrl}/next-event`, {
+        // ✅ aquí también
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: newDate, token: user.token }),

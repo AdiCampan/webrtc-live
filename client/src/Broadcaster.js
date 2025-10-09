@@ -1,28 +1,29 @@
 import React, { useRef, useEffect, useState } from "react";
 import "./Broadcaster.css";
 
+// 🔹 Configuración ICE desde variables de entorno
 const rtcConfig = {
   iceServers: [
-    { urls: "stun:stun.relay.metered.ca:80" },
+    { urls: process.env.REACT_APP_STUN_URL },
     {
-      urls: "turn:standard.relay.metered.ca:80",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls: process.env.REACT_APP_TURN_URL,
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
     {
-      urls: "turn:standard.relay.metered.ca:80?transport=tcp",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls: process.env.REACT_APP_TURN_TCP_URL,
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
     {
-      urls: "turn:standard.relay.metered.ca:443",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls: process.env.REACT_APP_TURN_443_URL,
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
     {
-      urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-      username: "a84708960fcf4892420ec951",
-      credential: "TXNIBjBYy24WPj2r",
+      urls: process.env.REACT_APP_TURNS_443_TCP_URL,
+      username: process.env.REACT_APP_TURN_USERNAME,
+      credential: process.env.REACT_APP_TURN_CREDENTIAL,
     },
   ],
 };
@@ -367,6 +368,7 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
     </div>
   );
 }
+
 export default Broadcaster;
 
 //   return (
