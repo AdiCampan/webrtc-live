@@ -102,7 +102,7 @@ function App() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "active-broadcasts") {
-          console.log("📡 Idiomas activos:", data.languages);
+          console.log("📡 Idiomas activos:", data.active);
           setActiveLanguages(data.languages);
         }
       } catch (e) {
@@ -241,6 +241,7 @@ function App() {
               ].map(({ code, label, img }) => {
                 const isActive =
                   activeLanguages[code] || activeLanguage === code;
+
                 return (
                   <div className="language-option" key={code}>
                     {isActive && <div className="onair-badge">ONAIR</div>}
