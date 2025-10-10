@@ -199,27 +199,27 @@ html {
 /* ---------- Estado activo (neón + glow + barra) ---------- */
 .btn-language.active {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(255, 77, 109, 0.25),
-    0 0 24px rgba(255, 77, 109, 0.15);
+  box-shadow: 0 12px 40px rgba(255, 77, 109, 0.4),
+    0 0 40px rgba(255, 77, 109, 0.3);
 }
 
 /* barra glow debajo */
 .btn-language.active::after {
   content: "";
   position: absolute;
-  bottom: -8px;
+  bottom: -10px; /* un poco más abajo */
   left: 50%;
   transform: translateX(-50%);
-  width: 70%;
-  height: 8px;
+  width: 75%; /* un poco más ancho */
+  height: 10px; /* más gruesa */
   border-radius: 6px;
   background: linear-gradient(
     90deg,
     rgba(255, 77, 109, 1),
-    rgba(255, 120, 90, 0.8)
+    rgba(255, 120, 90, 0.9)
   );
-  box-shadow: 0 4px 18px rgba(255, 77, 109, 0.45),
-    0 0 28px rgba(255, 77, 109, 0.25);
+  box-shadow: 0 6px 25px rgba(255, 77, 109, 0.6),
+    0 0 35px rgba(255, 77, 109, 0.4); /* glow más intenso */
   z-index: 1;
 }
 
@@ -231,13 +231,14 @@ html {
   transform: translateX(-50%);
   background: #ff2f2f;
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 0.75rem; /* un poquito más grande */
   font-weight: 700;
-  padding: 3px 7px;
+  padding: 4px 8px; /* más relleno */
   border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(255, 47, 47, 0.24);
+  box-shadow: 0 8px 22px rgba(255, 47, 47, 0.35),
+    0 0 35px rgba(255, 47, 47, 0.25);
   z-index: 2;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.7px;
 }
 
 /* ---------- Etiqueta bajo cada botón ---------- */
