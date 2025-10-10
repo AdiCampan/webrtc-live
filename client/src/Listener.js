@@ -217,7 +217,7 @@ function Listener({ signalingServer, language, setRole }) {
 
   return (
     <div className="listener-wrapper">
-      <h3>
+      <h3 className="listener-title">
         🎧 Escuchando en{" "}
         {language === "es"
           ? "Español"
@@ -241,11 +241,20 @@ function Listener({ signalingServer, language, setRole }) {
         }}
       ></canvas>
 
-      <p style={{ marginTop: "8px" }}>Estado: {status}</p>
+      <div className={`listener-status ${status}`}>
+        {status === "idle" && <span>🛑 No hay transmisión activa</span>}
+        {status === "requesting" && <span>📡 Solicitando conexión...</span>}
+        {status === "connecting" && <span>🔄 Conectando al transmisor...</span>}
+        {status === "connected" && <span>✅ Transmisión en vivo</span>}
+        {status === "error" && <span>⚠️ Error de conexión</span>}
+      </div>
 
-      <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
-        <button onClick={() => setRole(null)}>← Volver</button>
+      <div className="listener-buttons">
+        <button className="btn-back" onClick={() => setRole(null)}>
+          ← Volver
+        </button>
         <button
+          className="btn-retry"
           onClick={() => {
             if (pcRef.current) {
               try {

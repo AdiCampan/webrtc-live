@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
 import "./Broadcaster.css";
-import spanishFlag from "./Assets/spanish-flag4.png";
-import englishFlag from "./Assets/english-flag.png";
-import romanianFlag from "./Assets/romanian-flag2.png";
+import spanishFlag from "./Assets/spanish-flag4.webp";
+import englishFlag from "./Assets/english-flag.webp";
+import romanianFlag from "./Assets/romanian-flag2.webp";
 import liveMicIcon from "./Assets/live.png";
 
 // 🔹 Configuración ICE desde variables de entorno
@@ -36,7 +36,13 @@ const rtcConfig = {
   ].filter(Boolean), // 👈 elimina las entradas undefined automáticamente
 };
 
-function Broadcaster({ signalingServer, language, token, setRole }) {
+function Broadcaster({
+  signalingServer,
+  language,
+  token,
+  setRole,
+  onLanguageActive,
+}) {
   const peers = useRef({});
   const streamRef = useRef(null);
   const [broadcasting, setBroadcasting] = useState(false);
@@ -179,6 +185,7 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
       alert("⚠️ Por favor selecciona un idioma para transmitir.");
       return;
     }
+    if (onLanguageActive) onLanguageActive(activeLang);
 
     if (!streamRef.current) {
       try {
@@ -285,111 +292,6 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
 
     setBroadcasting(true);
   };
-
-  // // Iniciar transmisión
-  // const startBroadcast = async (lang) => {
-  //   const activeLang = lang || selectedLanguage || language;
-
-  //   if (!token) {
-  //     alert("⚠️ No tienes autorización para emitir. Por favor inicia sesión.");
-  //     return;
-  //   }
-
-  //   if (!activeLang) {
-  //     alert("⚠️ Por favor selecciona un idioma para transmitir.");
-  //     return;
-  //   }
-
-  //   if (!streamRef.current) {
-  //     try {
-  //       streamRef.current = await navigator.mediaDevices.getUserMedia({
-  //         audio: selectedDeviceId
-  //           ? { deviceId: { exact: selectedDeviceId } }
-  //           : true,
-  //       });
-
-  //       // Visualizador de audio
-  //       if (!audioCtxRef.current) {
-  //         const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  //          await audioCtxRef.current.resume();
-  //         audioCtxRef.current = new AudioCtx();
-  //         const analyser = audioCtxRef.current.createAnalyser();
-  //         analyser.fftSize = 1024;
-  //         analyserRef.current = analyser;
-
-  //         const src = audioCtxRef.current.createMediaStreamSource(
-  //           streamRef.current
-  //         );
-  //         src.connect(analyser);
-  //         dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
-  //         dataWaveRef.current = new Uint8Array(analyser.fftSize);
-
-  //         const draw = () => {
-  //           const canvas = canvasRef.current;
-  //           if (!canvas) return;
-  //           const ctx = canvas.getContext("2d");
-  //           const width = canvas.width;
-  //           const height = canvas.height;
-  //           ctx.clearRect(0, 0, width, height);
-
-  //           analyser.getByteTimeDomainData(dataWaveRef.current);
-  //           ctx.lineWidth = 2;
-  //           ctx.strokeStyle = "lime";
-  //           ctx.beginPath();
-  //           let x = 0;
-  //           const slice = width / dataWaveRef.current.length;
-  //           for (let i = 0; i < dataWaveRef.current.length; i++) {
-  //             const v = dataWaveRef.current[i] / 128.0;
-  //             const y = (v * height) / 2;
-  //             if (i === 0) ctx.moveTo(x, y);
-  //             else ctx.lineTo(x, y);
-  //             x += slice;
-  //           }
-  //           ctx.stroke();
-
-  //           analyser.getByteFrequencyData(dataFreqRef.current);
-  //           const barWidth = Math.max(1, width / dataFreqRef.current.length);
-  //           for (let i = 0; i < dataFreqRef.current.length; i++) {
-  //             const barHeight = (dataFreqRef.current[i] / 255) * height;
-  //             ctx.fillStyle = "rgba(0,255,255,0.4)";
-  //             ctx.fillRect(
-  //               i * barWidth,
-  //               height - barHeight,
-  //               barWidth,
-  //               barHeight
-  //             );
-  //           }
-
-  //           animRef.current = requestAnimationFrame(draw);
-  //         };
-  //         animRef.current = requestAnimationFrame(draw);
-  //       }
-  //     } catch (err) {
-  //       console.error("❌ Error accediendo micrófono:", err);
-  //       return;
-  //     }
-  //   }
-
-  //   // ✅ Registrar Broadcaster con idioma correcto
-  //   console.log("📡 Registrando broadcaster en idioma:", activeLang);
-  //   if (signalingServer.readyState === WebSocket.OPEN) {
-  //     signalingServer.send(
-  //       JSON.stringify({ type: "broadcaster", language: activeLang, token })
-  //     );
-  //   } else {
-  //     signalingServer.addEventListener(
-  //       "open",
-  //       () => {
-  //         signalingServer.send(
-  //           JSON.stringify({ type: "broadcaster", language: activeLang, token })
-  //         );
-  //       },
-  //       { once: true }
-  //     );
-  //   }
-
-  //   setBroadcasting(true);
-  // };
 
   // Cleanup
   useEffect(() => {

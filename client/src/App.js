@@ -5,10 +5,19 @@ import Listener from "./Listener";
 import "./App.css";
 import Countdown from "./Countdown";
 import Login from "./Login";
-import spanishFlag from "./Assets/spanish-flag4.png";
-import englishFlag from "./Assets/english-flag.png";
-import romanianFlag from "./Assets/romanian-flag2.png";
-import logo from "./Assets/logo.png";
+import spanishFlag from "./Assets/spanish-flag4.webp";
+import englishFlag from "./Assets/english-flag.webp";
+import romanianFlag from "./Assets/romanian-flag2.webp";
+import logo from "./Assets/logo2.webp";
+import {
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
+  Globe,
+  Youtube,
+  MessageCircle,
+} from "lucide-react";
 
 function App() {
   // WebSocket
@@ -18,6 +27,9 @@ function App() {
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
   const [nextEvent, setNextEvent] = useState(null);
+  const [activeLanguage, setActiveLanguage] = useState(null);
+
+  console.log("active language", activeLanguage);
   // Obtén la URL del backend desde la variable de entorno
   const apiUrl = process.env.REACT_APP_API_URL;
 
@@ -154,19 +166,7 @@ function App() {
         <p>Conectando con EBEN-EZER Media...</p>
       </div>
     );
-  // if (!ws)
-  //   return (
-  //     <div className="loading-screen">
-  //       <p>
-  //         Conectando
-  //         <span className="dots">
-  //           <span>.</span>
-  //           <span>.</span>
-  //           <span>.</span>
-  //         </span>
-  //       </p>
-  //     </div>
-  //   );
+
   console.log("user:", user);
   console.log("role:", role);
 
@@ -220,42 +220,34 @@ function App() {
               <li>Martes 20:00 - 21:30</li>
               <li>Jueves 20:00 -21:30 </li>
             </ul>
-            Si necesitas Auriculare/cascos adaptadores, contacta con el equipo
+            Si necesitas Auriculare/cascos o adaptadores, contacta con el equipo
             de sonido. ¡Gracias por acompañarnos!
           </div>
 
           {/* Botones de escuchar solo si no se ha seleccionado rol */}
           {!role && (
             <div className="language-buttons">
-              <div className="language-option">
-                <button
-                  className="btn-language"
-                  onClick={() => setRole({ role: "listener", language: "es" })}
-                >
-                  <img src={spanishFlag} alt="Español" />
-                </button>
-                <span className="btn-label">Escucha</span>
-              </div>
-
-              <div className="language-option">
-                <button
-                  className="btn-language"
-                  onClick={() => setRole({ role: "listener", language: "en" })}
-                >
-                  <img src={englishFlag} alt="Inglés" />
-                </button>
-                <span className="btn-label">Listen</span>
-              </div>
-
-              <div className="language-option">
-                <button
-                  className="btn-language"
-                  onClick={() => setRole({ role: "listener", language: "ro" })}
-                >
-                  <img src={romanianFlag} alt="Rumano" />
-                </button>
-                <span className="btn-label">Ascultă</span>
-              </div>
+              {[
+                { code: "es", label: "Escucha", img: spanishFlag },
+                { code: "en", label: "Listen", img: englishFlag },
+                { code: "ro", label: "Ascultă", img: romanianFlag },
+              ].map(({ code, label, img }) => {
+                const isActive = activeLanguage === code;
+                return (
+                  <div className="language-option" key={code}>
+                    {isActive && <div className="onair-badge">ONAIR</div>}
+                    <button
+                      className={`btn-language ${isActive ? "active" : ""}`}
+                      onClick={() =>
+                        setRole({ role: "listener", language: code })
+                      }
+                    >
+                      <img src={img} alt={label} />
+                    </button>
+                    <span className="btn-label">{label}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -277,6 +269,7 @@ function App() {
                 signalingServer={ws}
                 setRole={setRole}
                 token={user.token}
+                onLanguageActive={setActiveLanguage}
               />
             </div>
           )}
@@ -284,31 +277,62 @@ function App() {
 
         {/* COLUMNA DERECHA */}
         <div className="right-column">
-          <h2>Información y contacto</h2>
+          {/* <h2>Información y contacto</h2> */}
           <div className="logo-placeholder">
             <img src={logo} alt="logo" />
           </div>
           <div className="text-box right">
-            Dirección: Camí de la Donació, 89, 12004, Castellón de la Plana
-            <br />
-            Teléfono: +34 687-210-586
-            <br />
-            Email: biserica_ebenezer@yahoo.es
-            <br />
-            Horario:
-            <br />
-            Domingos 10:00 -12:00 y 18:00 - 20:00
-            <br />
-            Martes 20:00 - 21:30
-            <br />
-            Jueves 20:00 - 21:30
-            <br />
-            www.youtube.com/@bisericaebenezercastellon
-            <br />
-            🌐 Site web: www.bisericaebenezer.com
-            <br />
-            WhatsApp +34 624 227 214
-            <br />
+            <p>
+              <MapPin className="inline-icon" /> <strong>Dirección:</strong>{" "}
+              Camí de la Donació, 89, 12004, Castellón de la Plana
+            </p>
+
+            <p>
+              <Phone className="inline-icon" /> <strong>Teléfono:</strong> +34
+              687-210-586
+            </p>
+
+            <p>
+              <Mail className="inline-icon" /> <strong>Email:</strong>{" "}
+              biserica_ebenezer@yahoo.es
+            </p>
+
+            <p>
+              <Clock className="inline-icon" /> <strong>Horario:</strong>
+              <br />
+              Domingos 10:00–12:00 y 18:00–20:00
+              <br />
+              Martes 20:00–21:30
+              <br />
+              Jueves 20:00–21:30
+            </p>
+
+            <p>
+              <Youtube className="inline-icon" />{" "}
+              <a
+                href="https://www.youtube.com/@bisericaebenezercastellon"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                youtube.com/@bisericaebenezercastellon
+              </a>
+            </p>
+
+            <p>
+              <Globe className="inline-icon" />
+              <a
+                href="https://www.bisericaebenezer.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                www.bisericaebenezer.com
+              </a>
+            </p>
+
+            <p>
+              <MessageCircle className="inline-icon" />{" "}
+              <strong>WhatsApp:</strong> +34 624 227 214
+            </p>
           </div>
           <div></div>
           <div className="contact-box">

@@ -16,12 +16,14 @@
 }
 
 /* Título */
-.listener-card h2 {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #fff;
-  margin-bottom: 1rem;
+.listener-title {
   text-align: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 4px 0 4px 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 /* Reproductor de audio */
@@ -58,5 +60,97 @@
   canvas {
     width: 100% !important; /* visualizador de audio ajustable */
     height: 80px !important;
+  }
+}
+.listener-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+/* Botón base */
+.listener-buttons button {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* ← Volver */
+.btn-back {
+  background: #444;
+  color: #fff;
+}
+
+.btn-back:hover {
+  background: #666;
+}
+
+/* 🔄 Reintentar */
+.btn-retry {
+  background: #0078ff;
+  color: #fff;
+}
+
+.btn-retry:hover {
+  background: #005ecc;
+}
+
+/* Efecto de clic */
+.listener-buttons button:active {
+  transform: scale(0.97);
+}
+/* Estado general */
+.listener-status {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  transition: all 0.3s ease;
+}
+
+/* Colores según estado */
+.listener-status.idle {
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.listener-status.requesting,
+.listener-status.connecting {
+  color: #ffcc00;
+  background: rgba(255, 204, 0, 0.1);
+  animation: pulse 1.2s infinite;
+}
+
+.listener-status.connected {
+  color: #00ff99;
+  background: rgba(0, 255, 153, 0.1);
+  box-shadow: 0 0 8px rgba(0, 255, 153, 0.3);
+}
+
+.listener-status.error {
+  color: #ff6666;
+  background: rgba(255, 102, 102, 0.1);
+}
+
+/* Animación de pulso para “conectando” */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
   }
 }
