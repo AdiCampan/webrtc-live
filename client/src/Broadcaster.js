@@ -321,7 +321,7 @@ function Broadcaster({
     <div className="broadcaster-container">
       {!language && !selectedLanguage ? (
         <>
-          <h2>🎙️ Selecciona el idioma que deseas transmitir</h2>
+          <h3>🎙️ Selecciona el idioma que deseas transmitir</h3>
           <div className="language-buttons">
             {[
               { code: "es", label: "Emitir", img: spanishFlag },
