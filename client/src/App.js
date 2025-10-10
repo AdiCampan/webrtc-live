@@ -26,14 +26,18 @@ function App() {
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const keepaliveIntervalRef = useRef(null);
+
+  // Fechas y estado de idiomas
   const [nextEvent, setNextEvent] = useState(null);
   const [activeLanguage, setActiveLanguage] = useState(null);
-  const [activeLanguages, setActiveLanguages] = useState({}); // 🔹 Mapa de idiomas ON AIR
+  const [activeLanguages, setActiveLanguages] = useState({
+    es: false,
+    en: false,
+    ro: false,
+  });
 
-  // Usuario logueado (admin)
+  // Usuario logueado y rol
   const [user, setUser] = useState(null);
-
-  // Rol activo
   const [role, setRole] = useState(null);
 
   // URL WebSocket
@@ -102,8 +106,13 @@ function App() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "active-broadcasts") {
+          // 🔹 Aseguramos que siempre existan las claves
+          setActiveLanguages({
+            es: !!data.active?.es,
+            en: !!data.active?.en,
+            ro: !!data.active?.ro,
+          });
           console.log("📡 Idiomas activos:", data.active);
-          setActiveLanguages(data.languages);
         }
       } catch (e) {
         console.error("⚠️ Error procesando mensaje WS:", e);
@@ -241,7 +250,6 @@ function App() {
               ].map(({ code, label, img }) => {
                 const isActive =
                   activeLanguages[code] || activeLanguage === code;
-
                 return (
                   <div className="language-option" key={code}>
                     {isActive && <div className="onair-badge">ONAIR</div>}
