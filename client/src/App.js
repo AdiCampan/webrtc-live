@@ -28,29 +28,7 @@ function App() {
   const keepaliveIntervalRef = useRef(null);
   const [nextEvent, setNextEvent] = useState(null);
   const [activeLanguage, setActiveLanguage] = useState(null);
-
-  console.log("active language", activeLanguage);
-  // Obtén la URL del backend desde la variable de entorno
-  const apiUrl = process.env.REACT_APP_API_URL;
-
-  useEffect(() => {
-    fetch("/next-event") // ✅ aquí usamos la URL completa
-      .then((res) => res.json())
-      .then((data) => setNextEvent(data.date))
-      .catch((err) => console.error("Error al obtener la fecha:", err));
-  }, []);
-
-  const handleSetNextEvent = async (newDate) => {
-    setNextEvent(newDate);
-    if (user?.token) {
-      await fetch("/next-event", {
-        // ✅ aquí también
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: newDate, token: user.token }),
-      });
-    }
-  };
+  const [activeLanguages, setActiveLanguages] = useState({}); // 🔹 Mapa de idiomas ON AIR
 
   // Usuario logueado (admin)
   const [user, setUser] = useState(null);
@@ -64,7 +42,24 @@ function App() {
     return `${protocol}://${window.location.host}`;
   })();
 
-  // const signalingUrl = process.env.REACT_APP_API_URL.replace(/^http/, "ws"); // para pruebas locales
+  // ----------------- Obtener fecha del próximo evento -----------------
+  useEffect(() => {
+    fetch("/next-event")
+      .then((res) => res.json())
+      .then((data) => setNextEvent(data.date))
+      .catch((err) => console.error("Error al obtener la fecha:", err));
+  }, []);
+
+  const handleSetNextEvent = async (newDate) => {
+    setNextEvent(newDate);
+    if (user?.token) {
+      await fetch("/next-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: newDate, token: user.token }),
+      });
+    }
+  };
 
   // ----------------- WEBSOCKET -----------------
   const createWebSocket = (url) => {
@@ -74,7 +69,7 @@ function App() {
         wsRef.current.onclose = null;
         wsRef.current.onerror = null;
         wsRef.current.close();
-      } catch (e) {}
+      } catch {}
       wsRef.current = null;
     }
 
@@ -99,7 +94,20 @@ function App() {
       console.error("❌ Error WebSocket:", err);
       try {
         socket.close();
-      } catch (e) {}
+      } catch {}
+    };
+
+    // 🟢 ESCUCHAR ESTADO DE TRANSMISIONES ACTIVAS
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "active-broadcasts") {
+          console.log("📡 Idiomas activos:", data.languages);
+          setActiveLanguages(data.languages);
+        }
+      } catch (e) {
+        console.error("⚠️ Error procesando mensaje WS:", e);
+      }
     };
 
     return socket;
@@ -152,7 +160,7 @@ function App() {
           wsRef.current.onclose = null;
           wsRef.current.onerror = null;
           wsRef.current.close();
-        } catch (e) {}
+        } catch {}
         wsRef.current = null;
       }
     };
@@ -167,9 +175,6 @@ function App() {
       </div>
     );
 
-  console.log("user:", user);
-  console.log("role:", role);
-
   return (
     <div className="App">
       <div className="grid-layout">
@@ -180,6 +185,7 @@ function App() {
             onSetTargetDate={handleSetNextEvent}
             role={role?.role}
           />
+
           {!user ? (
             <Login
               onLogin={(data) => {
@@ -207,6 +213,7 @@ function App() {
           )}
         </div>
 
+        {/* COLUMNA CENTRAL */}
         <div className="center-column">
           <h1 className="live-title">TRADUCCIÓN EN VIVO</h1>
 
@@ -220,8 +227,8 @@ function App() {
               <li>Martes 20:00 - 21:30</li>
               <li>Jueves 20:00 -21:30 </li>
             </ul>
-            Si necesitas Auriculare/cascos o adaptadores, contacta con el equipo
-            de sonido. ¡Gracias por acompañarnos!
+            Si necesitas auriculares o adaptadores, contacta con el equipo de
+            sonido. ¡Gracias por acompañarnos!
           </div>
 
           {/* Botones de escuchar solo si no se ha seleccionado rol */}
@@ -232,7 +239,8 @@ function App() {
                 { code: "en", label: "Listen", img: englishFlag },
                 { code: "ro", label: "Ascultă", img: romanianFlag },
               ].map(({ code, label, img }) => {
-                const isActive = activeLanguage === code;
+                const isActive =
+                  activeLanguages[code] || activeLanguage === code;
                 return (
                   <div className="language-option" key={code}>
                     {isActive && <div className="onair-badge">ONAIR</div>}
@@ -264,39 +272,34 @@ function App() {
 
           {/* Broadcaster */}
           {role?.role === "broadcaster" && user?.token && (
-            <div>
-              <Broadcaster
-                signalingServer={ws}
-                setRole={setRole}
-                token={user.token}
-                onLanguageActive={setActiveLanguage}
-              />
-            </div>
+            <Broadcaster
+              signalingServer={ws}
+              setRole={setRole}
+              token={user.token}
+              onLanguageActive={setActiveLanguage}
+            />
           )}
         </div>
 
         {/* COLUMNA DERECHA */}
         <div className="right-column">
-          {/* <h2>Información y contacto</h2> */}
           <div className="logo-placeholder">
             <img src={logo} alt="logo" />
           </div>
+
           <div className="text-box right">
             <p>
               <MapPin className="inline-icon" /> <strong>Dirección:</strong>{" "}
               Camí de la Donació, 89, 12004, Castellón de la Plana
             </p>
-
             <p>
               <Phone className="inline-icon" /> <strong>Teléfono:</strong> +34
               687-210-586
             </p>
-
             <p>
               <Mail className="inline-icon" /> <strong>Email:</strong>{" "}
               biserica_ebenezer@yahoo.es
             </p>
-
             <p>
               <Clock className="inline-icon" /> <strong>Horario:</strong>
               <br />
@@ -306,7 +309,6 @@ function App() {
               <br />
               Jueves 20:00–21:30
             </p>
-
             <p>
               <Youtube className="inline-icon" />{" "}
               <a
@@ -317,7 +319,6 @@ function App() {
                 youtube.com/@bisericaebenezercastellon
               </a>
             </p>
-
             <p>
               <Globe className="inline-icon" />
               <a
@@ -328,13 +329,12 @@ function App() {
                 www.bisericaebenezer.com
               </a>
             </p>
-
             <p>
               <MessageCircle className="inline-icon" />{" "}
               <strong>WhatsApp:</strong> +34 624 227 214
             </p>
           </div>
-          <div></div>
+
           <div className="contact-box">
             <button className="btn-contact">Contáctanos</button>
           </div>
@@ -355,29 +355,56 @@ export default App;
 // import "./App.css";
 // import Countdown from "./Countdown";
 // import Login from "./Login";
-
-// /*
-//   App.js con:
-//     - reconexión automática WebSocket (backoff exponencial)
-//     - keepalive (ping) para mantener la conexión viva
-//     - limpieza de timers y socket al desmontar
-//     - JWT: login separado de selección de idioma
-// */
+// import spanishFlag from "./Assets/spanish-flag4.webp";
+// import englishFlag from "./Assets/english-flag.webp";
+// import romanianFlag from "./Assets/romanian-flag2.webp";
+// import logo from "./Assets/logo2.webp";
+// import {
+//   MapPin,
+//   Phone,
+//   Mail,
+//   Clock,
+//   Globe,
+//   Youtube,
+//   MessageCircle,
+// } from "lucide-react";
 
 // function App() {
-//   const nextEvent = "2025-10-10T12:00:00";
-
 //   // WebSocket
 //   const [ws, setWs] = useState(null);
 //   const wsRef = useRef(null);
 //   const reconnectAttemptRef = useRef(0);
 //   const reconnectTimeoutRef = useRef(null);
 //   const keepaliveIntervalRef = useRef(null);
+//   const [nextEvent, setNextEvent] = useState(null);
+//   const [activeLanguage, setActiveLanguage] = useState(null);
 
-//   // Usuario logueado { role: "broadcaster", token: "..." }
+//   // Obtén la URL del backend desde la variable de entorno
+//   const apiUrl = process.env.REACT_APP_API_URL;
+
+//   useEffect(() => {
+//     fetch("/next-event") // ✅ aquí usamos la URL completa
+//       .then((res) => res.json())
+//       .then((data) => setNextEvent(data.date))
+//       .catch((err) => console.error("Error al obtener la fecha:", err));
+//   }, []);
+
+//   const handleSetNextEvent = async (newDate) => {
+//     setNextEvent(newDate);
+//     if (user?.token) {
+//       await fetch("/next-event", {
+//         // ✅ aquí también
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ date: newDate, token: user.token }),
+//       });
+//     }
+//   };
+
+//   // Usuario logueado (admin)
 //   const [user, setUser] = useState(null);
 
-//   // Selección de rol e idioma { role: "broadcaster"|"listener", language: "es"|"en"|"ro" }
+//   // Rol activo
 //   const [role, setRole] = useState(null);
 
 //   // URL WebSocket
@@ -386,9 +413,9 @@ export default App;
 //     return `${protocol}://${window.location.host}`;
 //   })();
 
-//   const signalingUrl = "ws://localhost:8080"; // para pruebas locales
+//   // const signalingUrl = process.env.REACT_APP_API_URL.replace(/^http/, "ws"); // para pruebas locales
 
-//   // ------ FUNCIONES DE CONEXIÓN Y RECONEXIÓN ------
+//   // ----------------- WEBSOCKET -----------------
 //   const createWebSocket = (url) => {
 //     if (wsRef.current) {
 //       try {
@@ -460,17 +487,14 @@ export default App;
 //     }
 //   };
 
-//   // ------ EFECTO PRINCIPAL ------
 //   useEffect(() => {
 //     createWebSocket(signalingUrl);
-
 //     return () => {
 //       if (reconnectTimeoutRef.current) {
 //         clearTimeout(reconnectTimeoutRef.current);
 //         reconnectTimeoutRef.current = null;
 //       }
 //       stopKeepalive();
-
 //       if (wsRef.current) {
 //         try {
 //           wsRef.current.onopen = null;
@@ -483,103 +507,190 @@ export default App;
 //     };
 //   }, []);
 
-//   // ------ UI ------
-//   if (!ws) {
+//   // ----------------- UI -----------------
+//   if (!ws)
 //     return (
-//       <p className="text-center mt-10">
-//         Conectando al servidor de señalización...
-//       </p>
+//       <div className="loading-screen">
+//         <div className="logo-pulse">⛪</div>
+//         <p>Conectando con EBEN-EZER Media...</p>
+//       </div>
 //     );
-//   }
+
+//   console.log("user:", user);
+//   console.log("role:", role);
 
 //   return (
 //     <div className="App">
-//       <div className="app-container">
-//         <h1 style={{ margin: "20px" }}>TRADUCCIÓN EN VIVO</h1>
+//       <div className="grid-layout">
+//         {/* COLUMNA IZQUIERDA */}
+//         <div className="left-column">
+//           <Countdown
+//             targetDate={nextEvent}
+//             onSetTargetDate={handleSetNextEvent}
+//             role={role?.role}
+//           />
+//           {!user ? (
+//             <Login
+//               onLogin={(data) => {
+//                 setUser(data);
+//                 if (data.role === "broadcaster") {
+//                   setRole({ role: "broadcaster" });
+//                 }
+//               }}
+//             />
+//           ) : (
+//             <div className="logout-box">
+//               <p>
+//                 Conectado como <strong>{user.role}</strong>
+//               </p>
+//               <button
+//                 className="btn-logout"
+//                 onClick={() => {
+//                   setUser(null);
+//                   setRole(null);
+//                 }}
+//               >
+//                 Cerrar sesión
+//               </button>
+//             </div>
+//           )}
+//         </div>
 
-//         {/* LOGIN */}
-//         {!user && <Login onLogin={(data) => setUser(data)} />}
+//         <div className="center-column">
+//           <h1 className="live-title">TRADUCCIÓN EN VIVO</h1>
 
-//         {/* SELECCIÓN DE ROL E IDIOMA */}
-//         {user && !role && (
-//           <div className="flex flex-col gap-6 w-full">
-//             {/* Sección Broadcaster */}
-//             {user.role === "broadcaster" && (
-//               <div className="broadcaster-section">
-//                 <h2>🎙️ Emitir transmisión</h2>
-//                 <div className="broadcasters-container">
-//                   <button
-//                     onClick={() =>
-//                       setRole({ role: "broadcaster", language: "es" })
-//                     }
-//                     className="btn-broadcaster"
-//                   >
-//                     🎙️ Español
-//                   </button>
-//                   <button
-//                     onClick={() =>
-//                       setRole({ role: "broadcaster", language: "en" })
-//                     }
-//                     className="btn-broadcaster"
-//                   >
-//                     🎙️ Inglés
-//                   </button>
-//                   <button
-//                     onClick={() =>
-//                       setRole({ role: "broadcaster", language: "ro" })
-//                     }
-//                     className="btn-broadcaster"
-//                   >
-//                     🎙️ Rumano
-//                   </button>
-//                 </div>
-//               </div>
-//             )}
+//           {/* Caja de texto central */}
+//           <div className="info-box">
+//             Bienvenidos a la transmisión en vivo con traducción simultánea de
+//             Iglesia Pentecostal Rumana EBEN-EZER Castellon de la Plana <br />
+//             <br /> El horario de las emisiones será:
+//             <ul>
+//               <li>Domingos 10:00 -12:00 y 18:00 - 20:00</li>
+//               <li>Martes 20:00 - 21:30</li>
+//               <li>Jueves 20:00 -21:30 </li>
+//             </ul>
+//             Si necesitas Auriculare/cascos o adaptadores, contacta con el equipo
+//             de sonido. ¡Gracias por acompañarnos!
+//           </div>
 
-//             {/* Sección Listener */}
+//           {/* Botones de escuchar solo si no se ha seleccionado rol */}
+//           {!role && (
 //             <div className="language-buttons">
-//               <button
-//                 className="btn-language espanol"
-//                 onClick={() => setRole({ role: "listener", language: "es" })}
-//               />
-//               <button
-//                 className="btn-language ingles"
-//                 onClick={() => setRole({ role: "listener", language: "en" })}
-//               />
-//               <button
-//                 className="btn-language rumano"
-//                 onClick={() => setRole({ role: "listener", language: "ro" })}
+//               {[
+//                 { code: "es", label: "Escucha", img: spanishFlag },
+//                 { code: "en", label: "Listen", img: englishFlag },
+//                 { code: "ro", label: "Ascultă", img: romanianFlag },
+//               ].map(({ code, label, img }) => {
+//                 const isActive = activeLanguage === code;
+//                 return (
+//                   <div className="language-option" key={code}>
+//                     {isActive && <div className="onair-badge">ONAIR</div>}
+//                     <button
+//                       className={`btn-language ${isActive ? "active" : ""}`}
+//                       onClick={() =>
+//                         setRole({ role: "listener", language: code })
+//                       }
+//                     >
+//                       <img src={img} alt={label} />
+//                     </button>
+//                     <span className="btn-label">{label}</span>
+//                   </div>
+//                 );
+//               })}
+//             </div>
+//           )}
+
+//           {/* Listener */}
+//           {role?.role === "listener" && (
+//             <div className="listener-container">
+//               <Listener
+//                 signalingServer={ws}
+//                 language={role.language}
+//                 setRole={setRole}
 //               />
 //             </div>
+//           )}
+
+//           {/* Broadcaster */}
+//           {role?.role === "broadcaster" && user?.token && (
+//             <div>
+//               <Broadcaster
+//                 signalingServer={ws}
+//                 setRole={setRole}
+//                 token={user.token}
+//                 onLanguageActive={setActiveLanguage}
+//               />
+//             </div>
+//           )}
+//         </div>
+
+//         {/* COLUMNA DERECHA */}
+//         <div className="right-column">
+//           {/* <h2>Información y contacto</h2> */}
+//           <div className="logo-placeholder">
+//             <img src={logo} alt="logo" />
 //           </div>
-//         )}
+//           <div className="text-box right">
+//             <p>
+//               <MapPin className="inline-icon" /> <strong>Dirección:</strong>{" "}
+//               Camí de la Donació, 89, 12004, Castellón de la Plana
+//             </p>
 
-//         {/* Broadcaster */}
-//         {role?.role === "broadcaster" && user?.token && (
-//           <Broadcaster
-//             signalingServer={ws}
-//             language={role.language}
-//             setRole={setRole}
-//             token={user.token}
-//           />
-//         )}
+//             <p>
+//               <Phone className="inline-icon" /> <strong>Teléfono:</strong> +34
+//               687-210-586
+//             </p>
 
-//         {/* Listener */}
-//         {role?.role === "listener" && (
-//           <Listener
-//             signalingServer={ws}
-//             language={role.language}
-//             setRole={setRole}
-//           />
-//         )}
+//             <p>
+//               <Mail className="inline-icon" /> <strong>Email:</strong>{" "}
+//               biserica_ebenezer@yahoo.es
+//             </p>
+
+//             <p>
+//               <Clock className="inline-icon" /> <strong>Horario:</strong>
+//               <br />
+//               Domingos 10:00–12:00 y 18:00–20:00
+//               <br />
+//               Martes 20:00–21:30
+//               <br />
+//               Jueves 20:00–21:30
+//             </p>
+
+//             <p>
+//               <Youtube className="inline-icon" />{" "}
+//               <a
+//                 href="https://www.youtube.com/@bisericaebenezercastellon"
+//                 target="_blank"
+//                 rel="noopener noreferrer"
+//               >
+//                 youtube.com/@bisericaebenezercastellon
+//               </a>
+//             </p>
+
+//             <p>
+//               <Globe className="inline-icon" />
+//               <a
+//                 href="https://www.bisericaebenezer.com"
+//                 target="_blank"
+//                 rel="noopener noreferrer"
+//               >
+//                 www.bisericaebenezer.com
+//               </a>
+//             </p>
+
+//             <p>
+//               <MessageCircle className="inline-icon" />{" "}
+//               <strong>WhatsApp:</strong> +34 624 227 214
+//             </p>
+//           </div>
+//           <div></div>
+//           <div className="contact-box">
+//             <button className="btn-contact">Contáctanos</button>
+//           </div>
+//         </div>
 //       </div>
 
-//       <Countdown targetDate={nextEvent} />
-
-//       {/* Footer */}
-//       <footer className="footer">
-//         <p>© EBEN-EZER Media 2025</p>
-//       </footer>
+//       <footer className="footer">© EBEN-EZER Media 2025</footer>
 //     </div>
 //   );
 // }
