@@ -179,9 +179,10 @@ wss.on("connection", (ws, req) => {
       // ==========================
       // Detener transmisión manualmente
       // ==========================
+
       if (data.type === "stop-broadcast" && data.language) {
         delete broadcasters[data.language];
-        delete activeBroadcasts[data.language];
+        activeBroadcasts[data.language] = false; // 🔹 marcar como inactivo
 
         console.log(`🛑 Transmisión detenida para ${data.language}`);
         broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
@@ -252,7 +253,7 @@ wss.on("connection", (ws, req) => {
 
     if (ws.isBroadcaster && ws.language) {
       delete broadcasters[ws.language];
-      delete activeBroadcasts[ws.language];
+      activeBroadcasts[ws.language] = false; // 🔹 marcar como inactivo
       console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
 
       // 🔹 Actualizar a todos los clientes
