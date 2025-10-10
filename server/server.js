@@ -39,7 +39,6 @@ const users = [
 // Endpoint login
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-
   const user = users.find(
     (u) => u.username === username && u.password === password
   );
@@ -120,7 +119,7 @@ const wss = new WebSocketServer({ server });
 const broadcasters = {}; // { es: ws, en: ws, ro: ws }
 
 // 🔹 Estado global de transmisiones activas
-const activeBroadcasts = {}; // { es: true, en: false, ro: true }
+const activeBroadcasts = { es: false, en: false, ro: false };
 
 // 🔹 Función para enviar un mensaje a todos los clientes conectados
 function broadcastToAll(message) {
@@ -179,10 +178,9 @@ wss.on("connection", (ws, req) => {
       // ==========================
       // Detener transmisión manualmente
       // ==========================
-
       if (data.type === "stop-broadcast" && data.language) {
-        delete broadcasters[data.language];
-        activeBroadcasts[data.language] = false; // 🔹 marcar como inactivo
+        broadcasters[data.language] = null;
+        activeBroadcasts[data.language] = false; // 🔹 marcar idioma como inactivo
 
         console.log(`🛑 Transmisión detenida para ${data.language}`);
         broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
@@ -252,8 +250,8 @@ wss.on("connection", (ws, req) => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
 
     if (ws.isBroadcaster && ws.language) {
-      delete broadcasters[ws.language];
-      activeBroadcasts[ws.language] = false; // 🔹 marcar como inactivo
+      broadcasters[ws.language] = null;
+      activeBroadcasts[ws.language] = false; // 🔹 marcar idioma como inactivo
       console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
 
       // 🔹 Actualizar a todos los clientes
