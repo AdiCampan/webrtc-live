@@ -1,5 +1,9 @@
 import React, { useRef, useEffect, useState } from "react";
 import "./Broadcaster.css";
+import spanishFlag from "./Assets/spanish-flag4.png";
+import englishFlag from "./Assets/english-flag.png";
+import romanianFlag from "./Assets/romanian-flag2.png";
+import liveMicIcon from "./Assets/live.png";
 
 // 🔹 Configuración ICE desde variables de entorno
 const rtcConfig = {
@@ -178,74 +182,90 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
 
     if (!streamRef.current) {
       try {
+        // 🔹 Obtener el stream de audio del micrófono seleccionado
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: selectedDeviceId
             ? { deviceId: { exact: selectedDeviceId } }
             : true,
         });
 
-        // Visualizador de audio
-        if (!audioCtxRef.current) {
-          const AudioCtx = window.AudioContext || window.webkitAudioContext;
-          audioCtxRef.current = new AudioCtx();
-          const analyser = audioCtxRef.current.createAnalyser();
-          analyser.fftSize = 1024;
-          analyserRef.current = analyser;
-
-          const src = audioCtxRef.current.createMediaStreamSource(
-            streamRef.current
-          );
-          src.connect(analyser);
-          dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
-          dataWaveRef.current = new Uint8Array(analyser.fftSize);
-
-          const draw = () => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const ctx = canvas.getContext("2d");
-            const width = canvas.width;
-            const height = canvas.height;
-            ctx.clearRect(0, 0, width, height);
-
-            analyser.getByteTimeDomainData(dataWaveRef.current);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "lime";
-            ctx.beginPath();
-            let x = 0;
-            const slice = width / dataWaveRef.current.length;
-            for (let i = 0; i < dataWaveRef.current.length; i++) {
-              const v = dataWaveRef.current[i] / 128.0;
-              const y = (v * height) / 2;
-              if (i === 0) ctx.moveTo(x, y);
-              else ctx.lineTo(x, y);
-              x += slice;
-            }
-            ctx.stroke();
-
-            analyser.getByteFrequencyData(dataFreqRef.current);
-            const barWidth = Math.max(1, width / dataFreqRef.current.length);
-            for (let i = 0; i < dataFreqRef.current.length; i++) {
-              const barHeight = (dataFreqRef.current[i] / 255) * height;
-              ctx.fillStyle = "rgba(0,255,255,0.4)";
-              ctx.fillRect(
-                i * barWidth,
-                height - barHeight,
-                barWidth,
-                barHeight
-              );
-            }
-
-            animRef.current = requestAnimationFrame(draw);
-          };
-          animRef.current = requestAnimationFrame(draw);
+        // 🔹 Visualizador de audio
+        // Cerrar AudioContext viejo si existe
+        if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+          await audioCtxRef.current.close();
         }
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioCtxRef.current = new AudioCtx();
+        await audioCtxRef.current.resume(); // ⚡ Asegurar que no esté suspendido
+
+        const analyser = audioCtxRef.current.createAnalyser();
+        analyser.fftSize = 1024;
+        analyserRef.current = analyser;
+
+        const src = audioCtxRef.current.createMediaStreamSource(
+          streamRef.current
+        );
+        src.connect(analyser);
+
+        // Opcional: si quieres escuchar el audio local
+        // analyser.connect(audioCtxRef.current.destination);
+
+        dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
+        dataWaveRef.current = new Uint8Array(analyser.fftSize);
+
+        const draw = () => {
+          const canvas = canvasRef.current;
+          if (!canvas) {
+            animRef.current = requestAnimationFrame(draw);
+            return;
+          }
+
+          const ctx = canvas.getContext("2d");
+          const rect = canvas.getBoundingClientRect();
+          canvas.width = rect.width;
+          canvas.height = rect.height;
+          const width = canvas.width;
+          const height = canvas.height;
+
+          ctx.clearRect(0, 0, width, height);
+
+          // 🎵 Forma de onda
+          analyser.getByteTimeDomainData(dataWaveRef.current);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "lime";
+          ctx.beginPath();
+          let x = 0;
+          const slice = width / dataWaveRef.current.length;
+          for (let i = 0; i < dataWaveRef.current.length; i++) {
+            const v = dataWaveRef.current[i] / 128.0;
+            const y = (v * height) / 2;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+            x += slice;
+          }
+          ctx.stroke();
+
+          // 🎚️ Frecuencia (barras)
+          analyser.getByteFrequencyData(dataFreqRef.current);
+          const barWidth = Math.max(1, width / dataFreqRef.current.length);
+          for (let i = 0; i < dataFreqRef.current.length; i++) {
+            const barHeight = (dataFreqRef.current[i] / 255) * height;
+            ctx.fillStyle = "rgba(0,255,255,0.4)";
+            ctx.fillRect(i * barWidth, height - barHeight, barWidth, barHeight);
+          }
+
+          animRef.current = requestAnimationFrame(draw);
+        };
+
+        animRef.current = requestAnimationFrame(draw);
       } catch (err) {
         console.error("❌ Error accediendo micrófono:", err);
         return;
       }
     }
 
-    // ✅ Registrar Broadcaster con idioma correcto
+    // 🔹 Registrar Broadcaster en el signaling server
     console.log("📡 Registrando broadcaster en idioma:", activeLang);
     if (signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(
@@ -266,6 +286,111 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
     setBroadcasting(true);
   };
 
+  // // Iniciar transmisión
+  // const startBroadcast = async (lang) => {
+  //   const activeLang = lang || selectedLanguage || language;
+
+  //   if (!token) {
+  //     alert("⚠️ No tienes autorización para emitir. Por favor inicia sesión.");
+  //     return;
+  //   }
+
+  //   if (!activeLang) {
+  //     alert("⚠️ Por favor selecciona un idioma para transmitir.");
+  //     return;
+  //   }
+
+  //   if (!streamRef.current) {
+  //     try {
+  //       streamRef.current = await navigator.mediaDevices.getUserMedia({
+  //         audio: selectedDeviceId
+  //           ? { deviceId: { exact: selectedDeviceId } }
+  //           : true,
+  //       });
+
+  //       // Visualizador de audio
+  //       if (!audioCtxRef.current) {
+  //         const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  //          await audioCtxRef.current.resume();
+  //         audioCtxRef.current = new AudioCtx();
+  //         const analyser = audioCtxRef.current.createAnalyser();
+  //         analyser.fftSize = 1024;
+  //         analyserRef.current = analyser;
+
+  //         const src = audioCtxRef.current.createMediaStreamSource(
+  //           streamRef.current
+  //         );
+  //         src.connect(analyser);
+  //         dataFreqRef.current = new Uint8Array(analyser.frequencyBinCount);
+  //         dataWaveRef.current = new Uint8Array(analyser.fftSize);
+
+  //         const draw = () => {
+  //           const canvas = canvasRef.current;
+  //           if (!canvas) return;
+  //           const ctx = canvas.getContext("2d");
+  //           const width = canvas.width;
+  //           const height = canvas.height;
+  //           ctx.clearRect(0, 0, width, height);
+
+  //           analyser.getByteTimeDomainData(dataWaveRef.current);
+  //           ctx.lineWidth = 2;
+  //           ctx.strokeStyle = "lime";
+  //           ctx.beginPath();
+  //           let x = 0;
+  //           const slice = width / dataWaveRef.current.length;
+  //           for (let i = 0; i < dataWaveRef.current.length; i++) {
+  //             const v = dataWaveRef.current[i] / 128.0;
+  //             const y = (v * height) / 2;
+  //             if (i === 0) ctx.moveTo(x, y);
+  //             else ctx.lineTo(x, y);
+  //             x += slice;
+  //           }
+  //           ctx.stroke();
+
+  //           analyser.getByteFrequencyData(dataFreqRef.current);
+  //           const barWidth = Math.max(1, width / dataFreqRef.current.length);
+  //           for (let i = 0; i < dataFreqRef.current.length; i++) {
+  //             const barHeight = (dataFreqRef.current[i] / 255) * height;
+  //             ctx.fillStyle = "rgba(0,255,255,0.4)";
+  //             ctx.fillRect(
+  //               i * barWidth,
+  //               height - barHeight,
+  //               barWidth,
+  //               barHeight
+  //             );
+  //           }
+
+  //           animRef.current = requestAnimationFrame(draw);
+  //         };
+  //         animRef.current = requestAnimationFrame(draw);
+  //       }
+  //     } catch (err) {
+  //       console.error("❌ Error accediendo micrófono:", err);
+  //       return;
+  //     }
+  //   }
+
+  //   // ✅ Registrar Broadcaster con idioma correcto
+  //   console.log("📡 Registrando broadcaster en idioma:", activeLang);
+  //   if (signalingServer.readyState === WebSocket.OPEN) {
+  //     signalingServer.send(
+  //       JSON.stringify({ type: "broadcaster", language: activeLang, token })
+  //     );
+  //   } else {
+  //     signalingServer.addEventListener(
+  //       "open",
+  //       () => {
+  //         signalingServer.send(
+  //           JSON.stringify({ type: "broadcaster", language: activeLang, token })
+  //         );
+  //       },
+  //       { once: true }
+  //     );
+  //   }
+
+  //   setBroadcasting(true);
+  // };
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -282,105 +407,140 @@ function Broadcaster({ signalingServer, language, token, setRole }) {
     };
   }, []);
 
+  const handleBack = () => {
+    if (broadcasting) {
+      // Si está transmitiendo, primero detener correctamente
+      if (streamRef.current)
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      Object.values(peers.current).forEach((p) => p.close());
+      peers.current = {};
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
+        audioCtxRef.current.close().catch(() => {});
+      setBroadcasting(false);
+    }
+
+    // En cualquier caso, volvemos a la selección de idioma
+    setSelectedLanguage(null);
+  };
+
   return (
     <div className="broadcaster-container">
       {!language && !selectedLanguage ? (
         <>
           <h2>🎙️ Selecciona el idioma que deseas transmitir</h2>
+
           <div className="language-buttons">
-            <button
-              className="btn-language espanol"
-              onClick={() => setSelectedLanguage("es")}
-              title="Emitir en Español"
-            />
-            <button
-              className="btn-language ingles"
-              onClick={() => setSelectedLanguage("en")}
-              title="Emitir en Inglés"
-            />
-            <button
-              className="btn-language rumano"
-              onClick={() => setSelectedLanguage("ro")}
-              title="Emitir en Rumano"
-            />
+            <div className="language-option">
+              <button
+                className="btn-language"
+                onClick={() => setSelectedLanguage("es")}
+              >
+                <img src={spanishFlag} alt="Español" />
+              </button>
+              <span className="btn-label">Emitir</span>
+            </div>
+
+            <div className="language-option">
+              <button
+                className="btn-language"
+                onClick={() => setSelectedLanguage("en")}
+              >
+                <img src={englishFlag} alt="Inglés" />
+              </button>
+              <span className="btn-label">Broadcast</span>
+            </div>
+
+            <div className="language-option">
+              <button
+                className="btn-language"
+                onClick={() => setSelectedLanguage("ro")}
+              >
+                <img src={romanianFlag} alt="Rumano" />
+              </button>
+              <span className="btn-label">Transmite</span>
+            </div>
           </div>
         </>
       ) : (
-        <>
-          <div>
-            🚀 Emitir en{" "}
-            {selectedLanguage === "es"
-              ? "Español"
-              : selectedLanguage === "en"
-              ? "Inglés"
-              : selectedLanguage === "ro"
-              ? "Rumano"
-              : language === "es"
-              ? "Español"
-              : language === "en"
-              ? "Inglés"
-              : "Rumano"}
-          </div>
-
-          <div className="mic-selector">
-            <label>🎤 Seleccionar micrófono:</label>
-            <select
-              value={selectedDeviceId || ""}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
-            >
-              {audioDevices.map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>
-                  {d.label || d.deviceId}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={() => startBroadcast(selectedLanguage || language)}
-            disabled={broadcasting}
-          >
-            {broadcasting ? "🔴 Transmitiendo..." : "🚀 Iniciar Transmisión"}
-          </button>
-
-          {broadcasting && (
+        <div className="broadcast-panel">
+          {/* Pantalla 1️⃣: Selección de micrófono y botones */}
+          {!broadcasting ? (
             <>
+              <h3 className="broadcast-title">
+                🚀 Transmitiendo en{" "}
+                <span className="lang-highlight">
+                  {selectedLanguage === "es"
+                    ? "Español"
+                    : selectedLanguage === "en"
+                    ? "Inglés"
+                    : selectedLanguage === "ro"
+                    ? "Rumano"
+                    : language === "es"
+                    ? "Español"
+                    : language === "en"
+                    ? "Inglés"
+                    : "Rumano"}
+                </span>
+              </h3>
+
+              <div className="mic-selector">
+                <label htmlFor="mic">🎤 Micrófono:</label>
+                <select
+                  id="mic"
+                  value={selectedDeviceId || ""}
+                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                >
+                  {audioDevices.map((d) => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label || d.deviceId}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
-                onClick={() => {
-                  if (streamRef.current)
-                    streamRef.current.getTracks().forEach((t) => t.stop());
-                  streamRef.current = null;
-
-                  Object.values(peers.current).forEach((p) => p.close());
-                  peers.current = {};
-
-                  if (animRef.current) cancelAnimationFrame(animRef.current);
-                  if (
-                    audioCtxRef.current &&
-                    audioCtxRef.current.state !== "closed"
-                  )
-                    audioCtxRef.current.close().catch(() => {});
-
-                  setBroadcasting(false);
-                  if (typeof setRole === "function") setRole(null);
-                }}
+                className="broadcast-btn"
+                onClick={() => startBroadcast(selectedLanguage || language)}
               >
-                🛑 Parar Transmisión
+                🚀 Iniciar Transmisión
               </button>
 
+              <button className="back-btn" onClick={handleBack}>
+                ⬅️ Volver
+              </button>
+            </>
+          ) : (
+            <div className="broadcasting-section">
+              {/* Icono y texto "Emitiendo en ..." */}
+              <div className="broadcasting-header">
+                <img src={liveMicIcon} alt="live icon" className="live-icon" />
+                <h3 className="broadcasting-text">
+                  Emitiendo en{" "}
+                  {selectedLanguage === "es"
+                    ? "Español"
+                    : selectedLanguage === "en"
+                    ? "Inglés"
+                    : "Rumano"}
+                </h3>
+              </div>
+
+              {/* Canvas */}
               <canvas
                 ref={canvasRef}
                 width={600}
                 height={200}
-                style={{
-                  border: "1px solid black",
-                  borderRadius: "15px",
-                  marginTop: "10px",
-                }}
+                className="audio-visualizer"
               />
-            </>
+
+              {/* Botón de detener transmisión */}
+              <button className="stop-btn" onClick={handleBack}>
+                🛑 Parar Transmisión
+              </button>
+            </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

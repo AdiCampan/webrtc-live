@@ -47,14 +47,12 @@ function App() {
   const [role, setRole] = useState(null);
 
   // URL WebSocket
-  // const signalingUrl = (() => {
-  //   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  //   return `${protocol}://${window.location.host}`;
-  // })();
+  const signalingUrl = (() => {
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${protocol}://${window.location.host}`;
+  })();
 
-  const signalingUrl = process.env.REACT_APP_API_URL.replace(/^http/, "ws"); // para pruebas locales
-
-  // const signalingUrl = "ws://localhost:8080"; // para pruebas locales
+  // const signalingUrl = process.env.REACT_APP_API_URL.replace(/^http/, "ws"); // para pruebas locales
 
   // ----------------- WEBSOCKET -----------------
   const createWebSocket = (url) => {
@@ -177,6 +175,11 @@ function App() {
       <div className="grid-layout">
         {/* COLUMNA IZQUIERDA */}
         <div className="left-column">
+          <Countdown
+            targetDate={nextEvent}
+            onSetTargetDate={handleSetNextEvent}
+            role={role?.role}
+          />
           {!user ? (
             <Login
               onLogin={(data) => {
@@ -202,11 +205,6 @@ function App() {
               </button>
             </div>
           )}
-          <Countdown
-            targetDate={nextEvent}
-            onSetTargetDate={handleSetNextEvent}
-            role={role?.role}
-          />
         </div>
 
         <div className="center-column">
@@ -274,7 +272,7 @@ function App() {
 
           {/* Broadcaster */}
           {role?.role === "broadcaster" && user?.token && (
-            <div className="broadcaster-container">
+            <div>
               <Broadcaster
                 signalingServer={ws}
                 setRole={setRole}
@@ -291,14 +289,28 @@ function App() {
             <img src={logo} alt="logo" />
           </div>
           <div className="text-box right">
-            Dirección: Calle Ejemplo 123, Ciudad
+            Dirección: Camí de la Donació, 89, 12004, Castellón de la Plana
             <br />
-            Teléfono: +34 123 456 789
+            Teléfono: +34 687-210-586
             <br />
-            Email: contacto@ejemplo.com
+            Email: biserica_ebenezer@yahoo.es
             <br />
-            Horario: Lunes a Viernes 9:00 - 18:00
+            Horario:
+            <br />
+            Domingos 10:00 -12:00 y 18:00 - 20:00
+            <br />
+            Martes 20:00 - 21:30
+            <br />
+            Jueves 20:00 - 21:30
+            <br />
+            www.youtube.com/@bisericaebenezercastellon
+            <br />
+            🌐 Site web: www.bisericaebenezer.com
+            <br />
+            WhatsApp +34 624 227 214
+            <br />
           </div>
+          <div></div>
           <div className="contact-box">
             <button className="btn-contact">Contáctanos</button>
           </div>

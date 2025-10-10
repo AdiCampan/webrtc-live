@@ -1,80 +1,315 @@
-/* Broadcaster.css */
+/* ───────────────────────────────
+   🎙️ Broadcaster Stylesheet
+   Limpio y responsive
+   ─────────────────────────────── */
 
-/* Contenedor del broadcaster */
+/* 📦 Contenedor principal del broadcaster */
 .broadcaster-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
   width: 100%;
-  max-width: 500px;
-  margin: 1rem 0;
+  height: 100%; /* ocupe todo el contenedor padre */
+  margin: 0;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  overflow: hidden; /* evita que elementos sobresalgan */
 }
 
-/* Botón de iniciar transmisión */
-.broadcast-btn {
+/* Contenido interno sin caja adicional */
+.language-buttons,
+h2 {
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Panel central: transparente para evitar cajas internas con sombra */
+.broadcast-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: none;
+  box-shadow: none;
   width: 100%;
-  padding: 1.5rem;
-  font-size: 1.25rem;
-  font-weight: 700;
-  border: none;
-  border-radius: 1.5rem;
-  cursor: pointer;
+  margin: auto;
+  /* padding: 1rem; */
+  box-sizing: border-box;
+}
+
+/* ───────────────────────────────
+   🏷️ Título y texto principal
+   ─────────────────────────────── */
+.broadcast-title {
+  font-size: 1.3rem;
+  font-weight: 600;
   color: #fff;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.lang-highlight {
+  color: #ff4b2b;
+  font-weight: 700;
+}
+
+/* ───────────────────────────────
+   🎤 Selector de micrófono
+   ─────────────────────────────── */
+.mic-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: #fff;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.mic-selector label {
+  font-weight: 500;
+}
+
+.mic-selector select {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: none;
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.95rem;
+  outline: none;
+  transition: background 0.2s ease;
+}
+
+.mic-selector select:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ───────────────────────────────
+   🚀 Botón principal de emisión
+   ─────────────────────────────── */
+.broadcast-btn {
+  width: 70%;
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  border: none;
+  border-radius: 1rem;
+  cursor: pointer;
   background: linear-gradient(45deg, #ff416c, #ff4b2b);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
   transition: all 0.3s ease;
+  text-align: center;
 }
 
-/* Hover */
-.broadcast-btn:hover {
+.broadcast-btn:hover:not(:disabled) {
   transform: translateY(-3px);
-  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.35);
-  background: linear-gradient(45deg, #ff4b2b, #ff416c);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
 }
 
-/* Estado deshabilitado */
 .broadcast-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Mensaje de transmisión activa */
+/* ───────────────────────────────
+   🔴 Estado de transmisión activa
+   ─────────────────────────────── */
+.broadcast-btn.broadcasting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 600px;
+  background: linear-gradient(45deg, #666, #444);
+  color: #fff;
+  border: none;
+  border-radius: 1rem;
+  font-weight: 600;
+  opacity: 0.9;
+  cursor: not-allowed;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+  gap: 5px;
+  padding: 0.5rem;
+}
+
+.broadcast-btn.broadcasting img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: brightness(1.2);
+  animation: pulse 1.4s infinite ease-in-out;
+}
+
+/* ───────────────────────────────
+   🛑 Botón de parar transmisión
+   ─────────────────────────────── */
+.stop-btn {
+  width: 100%;
+  max-width: 600px;
+  border: none;
+  border-radius: 1rem;
+  font-weight: 600;
+  background: #ff1744;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  padding: 1rem;
+  text-align: center;
+  font-size: 1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  max-width: 100%;
+  padding: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.stop-btn:hover {
+  background: #d32f2f;
+}
+
+/* ───────────────────────────────
+   ⬅️ Botón de volver
+   ─────────────────────────────── */
+.back-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  opacity: 1;
+  transform: translateX(-2px);
+}
+
+.back-btn.secondary {
+  color: #ffbaba;
+  font-weight: 600;
+}
+
+/* ───────────────────────────────
+   🎛️ Sección activa de transmisión
+   ─────────────────────────────── */
+.broadcasting-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  box-sizing: border-box;
+  /* gap: 1rem; */
+}
+.broadcasting-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+.live-icon {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  animation: pulse 1.4s infinite ease-in-out;
+}
 .broadcasting-text {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #fff;
-  margin-top: 1rem;
+  text-align: center;
 }
 
-/* Responsive para móviles */
-@media (max-width: 480px) {
+/* ───────────────────────────────
+   🎧 Canvas visualizador de audio
+   ─────────────────────────────── */
+
+.audio-visualizer {
+  width: 100%;
+  max-height: 40%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* ───────────────────────────────
+   📱 Responsive (móviles y pantallas pequeñas)
+   ─────────────────────────────── */
+@media (max-width: 600px) {
   .broadcast-btn {
-    padding: 1rem;
+    width: 100%;
+    padding: 0.9rem;
     font-size: 1rem;
   }
-}
 
-canvas {
-  width: 100% !important;
-  max-width: 600px;
-  border-radius: 15px;
-  margin-top: 10px;
-}
-@media (max-width: 480px) {
-  canvas {
-    height: 120px !important;
+  .broadcast-btn.broadcasting {
+    font-size: 0.9rem;
+    gap: 6px;
+  }
+
+  .broadcast-btn.broadcasting img {
+    width: 20px;
+    height: 20px;
+  }
+
+  .stop-btn {
+    width: 100%;
+    max-width: 600px;
+    padding: 0.8rem 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    background: #ff1744;
+    color: #fff;
+    border: none;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .stop-btn:hover {
+    background: #d32f2f;
+  }
+
+  .live-icon {
+    width: 60px;
+    height: 60px;
+  }
+
+  .broadcasting-text {
+    font-size: 1rem;
+  }
+
+  .audio-visualizer {
+    max-height: 30%;
   }
 }
-.mic-selector {
-  margin-bottom: 1rem;
-  color: #fff;
-}
 
-.mic-selector select {
-  margin-left: 0.5rem;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  border: none;
-  font-size: 1rem;
+/* ───────────────────────────────
+   ✨ Animación opcional para el estado en vivo
+   ─────────────────────────────── */
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
 }
