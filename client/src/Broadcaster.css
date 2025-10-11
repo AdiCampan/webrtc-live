@@ -119,6 +119,17 @@ h2 {
 /* ───────────────────────────────
    🔴 Estado de transmisión activa
    ─────────────────────────────── */
+
+.listener-count-broadcaster {
+  margin-left: 12px;
+  background: rgba(255, 47, 47, 0.85);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .broadcast-btn.broadcasting {
   display: flex;
   align-items: center;

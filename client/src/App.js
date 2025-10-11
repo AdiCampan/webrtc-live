@@ -111,21 +111,23 @@ function App() {
         const data = JSON.parse(event.data);
 
         // 🔹 Actualizar idiomas activos
-        if (data.type === "active-broadcasts") {
+        if (data.type === "active-broadcasts" && data.active) {
           setActiveLanguages({
-            es: !!data.active?.es,
-            en: !!data.active?.en,
-            ro: !!data.active?.ro,
+            es: !!data.active.es,
+            en: !!data.active.en,
+            ro: !!data.active.ro,
           });
           console.log("📡 Idiomas activos:", data.active);
         }
 
         // 🔹 Actualizar número de oyentes
         if (data.type === "listeners-count" && data.listeners) {
-          setListenerCounts((prev) => ({
-            ...prev,
-            ...data.listeners,
-          }));
+          // Reemplazar completamente el estado para reflejar la verdad actual
+          setListenerCounts({
+            es: data.listeners.es || 0,
+            en: data.listeners.en || 0,
+            ro: data.listeners.ro || 0,
+          });
           console.log("👂 Oyentes activos:", data.listeners);
         }
       } catch (e) {
@@ -290,13 +292,15 @@ function App() {
               ].map(({ code, label, img }) => {
                 const isActive =
                   activeLanguages[code] || activeLanguage === code;
+                const count = listenerCounts[code] || 0; // Número de oyentes siempre confiable
+
                 return (
                   <div className="language-option" key={code}>
                     {isActive && (
                       <div className="onair-badge">
                         ONAIR
                         <span className="listener-count">
-                          👂 {listenerCounts[code] || 0}
+                          {count > 0 ? `👂 ${count}` : ""}
                         </span>
                       </div>
                     )}

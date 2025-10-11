@@ -132,6 +132,18 @@ function broadcastToAll(message) {
   });
 }
 
+// 🔹 Función para actualizar conteo de oyentes por idioma
+function updateListenerCounts() {
+  const counts = { es: 0, en: 0, ro: 0 };
+  wss.clients.forEach((client) => {
+    if (!client.isBroadcaster && client.language) {
+      counts[client.language] = (counts[client.language] || 0) + 1;
+    }
+  });
+  Object.assign(listenersCount, counts);
+  broadcastToAll({ type: "listeners-count", listeners: listenersCount });
+}
+
 wss.on("connection", (ws, req) => {
   ws.id = uuidv4();
   ws.isBroadcaster = false;
@@ -142,6 +154,9 @@ wss.on("connection", (ws, req) => {
   // 🔹 Enviar estado actual al nuevo cliente
   ws.send(
     JSON.stringify({ type: "active-broadcasts", active: activeBroadcasts })
+  );
+  ws.send(
+    JSON.stringify({ type: "listeners-count", listeners: listenersCount })
   );
 
   ws.on("message", (msg) => {
@@ -195,15 +210,7 @@ wss.on("connection", (ws, req) => {
       // ==========================
       if (data.type === "request-offer" && data.language) {
         ws.language = data.language; // Guardamos idioma del listener
-
-        // 🔹 Registrar oyente activo
-        if (listenersCount[data.language] !== undefined) {
-          listenersCount[data.language]++;
-          broadcastToAll({
-            type: "listeners-count",
-            listeners: listenersCount,
-          });
-        }
+        updateListenerCounts(); // 🔹 actualizar conteo de oyentes
 
         const targetBroadcaster = broadcasters[data.language];
         if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
@@ -261,21 +268,16 @@ wss.on("connection", (ws, req) => {
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
 
-    // 🔹 Si era listener, restar uno del contador
-    if (!ws.isBroadcaster && ws.language && listenersCount[ws.language] > 0) {
-      listenersCount[ws.language]--;
-      broadcastToAll({
-        type: "listeners-count",
-        listeners: listenersCount,
-      });
+    // 🔹 Actualizar conteo de oyentes si era listener
+    if (!ws.isBroadcaster && ws.language) {
+      updateListenerCounts();
     }
 
+    // 🔹 Si era broadcaster, marcar como inactivo
     if (ws.isBroadcaster && ws.language) {
       broadcasters[ws.language] = null;
-      activeBroadcasts[ws.language] = false; // 🔹 marcar idioma como inactivo
+      activeBroadcasts[ws.language] = false;
       console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
-
-      // 🔹 Actualizar a todos los clientes
       broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
     }
   });

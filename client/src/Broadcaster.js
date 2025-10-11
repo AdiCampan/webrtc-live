@@ -71,6 +71,9 @@ function Broadcaster({
       const data = JSON.parse(event.data);
       console.log("📩 Broadcaster recibió:", data);
 
+      // ==========================
+      // Mensajes WebRTC
+      // ==========================
       if (data.type === "request-offer") {
         if (!streamRef.current) {
           console.warn("⚠️ No hay stream activo, no se puede crear Peer");
@@ -107,6 +110,17 @@ function Broadcaster({
             console.error("❌ Error agregando candidate:", err);
           }
         }
+      }
+
+      // ==========================
+      // Actualizar número de oyentes en tiempo real
+      // ==========================
+      if (data.type === "listeners-count") {
+        setListenerCounts((prev) => ({
+          ...prev,
+          ...data.listeners,
+        }));
+        console.log("👂 Oyentes activos:", data.listeners);
       }
     };
 
@@ -390,6 +404,9 @@ function Broadcaster({
                     ? "Inglés"
                     : "Rumano"}
                 </h3>
+                <span className="listener-count-broadcaster">
+                  👂 {listenerCounts[selectedLanguage] || 0} oyentes
+                </span>
               </div>
               <canvas
                 ref={canvasRef}
