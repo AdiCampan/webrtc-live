@@ -36,7 +36,11 @@ function App() {
     en: false,
     ro: false,
   });
-  const [listenerCounts, setListenerCounts] = useState({ es: 0, en: 0, ro: 0 });
+  const [listenerCounts, setListenerCounts] = useState({
+    es: 0,
+    en: 0,
+    ro: 0,
+  });
   // Usuario logueado y rol
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
@@ -101,33 +105,59 @@ function App() {
         socket.close();
       } catch {}
     };
-
     // 🟢 ESCUCHAR ESTADO DE TRANSMISIONES ACTIVAS
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // 🔹 Actualizar idiomas activos
         if (data.type === "active-broadcasts") {
-          // 🔹 Aseguramos que siempre existan las claves
           setActiveLanguages({
             es: !!data.active?.es,
             en: !!data.active?.en,
             ro: !!data.active?.ro,
           });
           console.log("📡 Idiomas activos:", data.active);
+        }
 
-          if (data.type === "listeners-count") {
-            setListenerCounts({
-              es: data.listeners.es || 0,
-              en: data.listeners.en || 0,
-              ro: data.listeners.ro || 0,
-            });
-            console.log("👂 Oyentes activos:", data.listeners);
-          }
+        // 🔹 Actualizar número de oyentes
+        if (data.type === "listeners-count" && data.listeners) {
+          setListenerCounts((prev) => ({
+            ...prev,
+            ...data.listeners,
+          }));
+          console.log("👂 Oyentes activos:", data.listeners);
         }
       } catch (e) {
         console.error("⚠️ Error procesando mensaje WS:", e);
       }
     };
+
+    // // 🟢 ESCUCHAR ESTADO DE TRANSMISIONES ACTIVAS
+    // socket.onmessage = (event) => {
+    //   try {
+    //     const data = JSON.parse(event.data);
+    //     if (data.type === "active-broadcasts") {
+    //       // 🔹 Aseguramos que siempre existan las claves
+    //       setActiveLanguages({
+    //         es: !!data.active?.es,
+    //         en: !!data.active?.en,
+    //         ro: !!data.active?.ro,
+    //       });
+    //       console.log("📡 Idiomas activos:", data.active);
+
+    //       if (data.type === "listeners-count") {
+    //         setListenerCounts((prev) => ({
+    //           ...prev,
+    //           ...data.listeners,
+    //         }));
+    //         console.log("👂 Oyentes activos:", data.listeners);
+    //       }
+    //     }
+    //   } catch (e) {
+    //     console.error("⚠️ Error procesando mensaje WS:", e);
+    //   }
+    // };
 
     return socket;
   };
