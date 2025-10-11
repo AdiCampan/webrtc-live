@@ -215,6 +215,22 @@ function Listener({ signalingServer, language, setRole }) {
     };
   }, [signalingServer, language]);
 
+  const handleBack = () => {
+    // avisar al servidor que este listener deja de escuchar
+    if (signalingServer.readyState === WebSocket.OPEN) {
+      signalingServer.send(
+        JSON.stringify({
+          type: "stop-listening",
+          language: language,
+          clientId: clientId, // si tienes un id local, si no se puede usar ws.id en el servidor
+        })
+      );
+    }
+
+    // lógica local para volver atrás
+    setRole(null);
+  };
+
   return (
     <div className="listener-wrapper">
       <h3 className="listener-title">
@@ -250,7 +266,7 @@ function Listener({ signalingServer, language, setRole }) {
       </div>
 
       <div className="listener-buttons">
-        <button className="btn-back" onClick={() => setRole(null)}>
+        <button className="btn-back" onClick={() => handleBack()}>
           ← Volver
         </button>
         <button

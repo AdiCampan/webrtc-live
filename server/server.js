@@ -272,6 +272,16 @@ wss.on("connection", (ws, req) => {
     if (!ws.isBroadcaster && ws.language) {
       updateListenerCounts();
     }
+    if (data.type === "stop-listening" && data.language) {
+      if (listenersCount[data.language] > 0) {
+        listenersCount[data.language]--;
+        broadcastToAll({
+          type: "listeners-count",
+          listeners: listenersCount,
+        });
+      }
+      console.log(`🛑 Listener dejó de escuchar ${data.language}`);
+    }
 
     // 🔹 Si era broadcaster, marcar como inactivo
     if (ws.isBroadcaster && ws.language) {
