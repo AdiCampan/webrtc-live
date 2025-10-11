@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./Listener.css";
+import { v4 as uuidv4 } from "uuid";
 
 const rtcConfig = {
   iceServers: [
@@ -41,6 +42,7 @@ function Listener({ signalingServer, language, setRole }) {
   const analyserRef = useRef(null);
   const dataArrayRef = useRef(null);
   const animationRef = useRef(null);
+  const [clientId] = useState(uuidv4());
 
   const requestOffer = () => {
     if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
@@ -220,13 +222,13 @@ function Listener({ signalingServer, language, setRole }) {
       signalingServer.send(
         JSON.stringify({
           type: "stop-listening",
-          language: language,
+          language,
+          clientId,
         })
       );
     }
     setRole(null);
   };
-
   return (
     <div className="listener-wrapper">
       <h3 className="listener-title">
