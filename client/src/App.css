@@ -240,6 +240,14 @@ html {
   z-index: 2;
   letter-spacing: 0.7px;
 }
+.listener-count {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-top: 2px;
+  color: #fff;
+  opacity: 0.85;
+}
 
 /* ---------- Etiqueta bajo cada botón ---------- */
 .btn-label {
