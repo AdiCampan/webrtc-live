@@ -222,7 +222,6 @@ function Listener({ signalingServer, language, setRole }) {
         JSON.stringify({
           type: "stop-listening",
           language: language,
-          clientId: clientId, // si tienes un id local, si no se puede usar ws.id en el servidor
         })
       );
     }
