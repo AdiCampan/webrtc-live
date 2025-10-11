@@ -49,6 +49,8 @@ function Broadcaster({
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState(null);
+  const [listenerCounts, setListenerCounts] = useState({ es: 0, en: 0, ro: 0 });
+
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
