@@ -18,6 +18,7 @@ import {
   Youtube,
   MessageCircle,
 } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 
 function App() {
   // WebSocket
@@ -35,7 +36,7 @@ function App() {
     en: false,
     ro: false,
   });
-
+  const [listenerCounts, setListenerCounts] = useState({ es: 0, en: 0, ro: 0 });
   // Usuario logueado y rol
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
@@ -113,6 +114,15 @@ function App() {
             ro: !!data.active?.ro,
           });
           console.log("📡 Idiomas activos:", data.active);
+
+          if (data.type === "listeners-count") {
+            setListenerCounts({
+              es: data.listeners.es || 0,
+              en: data.listeners.en || 0,
+              ro: data.listeners.ro || 0,
+            });
+            console.log("👂 Oyentes activos:", data.listeners);
+          }
         }
       } catch (e) {
         console.error("⚠️ Error procesando mensaje WS:", e);
@@ -252,7 +262,15 @@ function App() {
                   activeLanguages[code] || activeLanguage === code;
                 return (
                   <div className="language-option" key={code}>
-                    {isActive && <div className="onair-badge">ONAIR</div>}
+                    {isActive && (
+                      <div className="onair-badge">
+                        ONAIR
+                        <span className="listener-count">
+                          👂 {listenerCounts[code] || 0}
+                        </span>
+                      </div>
+                    )}
+
                     <button
                       className={`btn-language ${isActive ? "active" : ""}`}
                       onClick={() =>
@@ -345,7 +363,24 @@ function App() {
           </div>
 
           <div className="contact-box">
-            <button className="btn-contact">Contáctanos</button>
+            <a
+              href="https://wa.me/34637951683?text=Hola!%20Quisiera%20más%20información%20sobre%20la%20transmisión"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-contact"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="white"
+                style={{ marginRight: "8px" }}
+              >
+                <path d="M12.04 2C6.49 2 2 6.47 2 11.99c0 2.11.57 4.05 1.63 5.79L2 22l4.41-1.61c1.67.91 3.56 1.39 5.63 1.39h.01c5.55 0 10.04-4.47 10.04-9.99C22.08 6.47 17.59 2 12.04 2zm5.69 14.31c-.24.68-1.38 1.3-1.89 1.38-.48.07-1.08.1-1.74-.11-.4-.13-.92-.29-1.58-.57-2.78-1.19-4.6-3.97-4.74-4.15-.14-.18-1.13-1.49-1.13-2.84 0-1.35.72-2.02.98-2.3.26-.28.57-.35.76-.35.18 0 .38.01.55.01.18 0 .42-.07.65.5.24.57.82 1.98.89 2.12.07.14.11.3.02.48-.09.18-.13.3-.25.46-.13.16-.27.36-.39.49-.13.14-.27.29-.12.57.14.28.61.99 1.31 1.6.9.8 1.65 1.05 1.94 1.19.3.14.46.12.63-.07.18-.2.72-.83.92-1.12.2-.28.39-.23.65-.14.26.09 1.64.77 1.92.9.28.14.47.2.54.31.06.11.06.64-.18 1.32z" />
+              </svg>
+              Contáctanos
+            </a>
           </div>
         </div>
       </div>

@@ -121,6 +121,9 @@ const broadcasters = {}; // { es: ws, en: ws, ro: ws }
 // 🔹 Estado global de transmisiones activas
 const activeBroadcasts = { es: false, en: false, ro: false };
 
+// 🔹 Contador de oyentes activos por idioma
+const listenersCount = { es: 0, en: 0, ro: 0 };
+
 // 🔹 Función para enviar un mensaje a todos los clientes conectados
 function broadcastToAll(message) {
   const payload = JSON.stringify(message);
@@ -193,6 +196,15 @@ wss.on("connection", (ws, req) => {
       if (data.type === "request-offer" && data.language) {
         ws.language = data.language; // Guardamos idioma del listener
 
+        // 🔹 Registrar oyente activo
+        if (listenersCount[data.language] !== undefined) {
+          listenersCount[data.language]++;
+          broadcastToAll({
+            type: "listeners-count",
+            listeners: listenersCount,
+          });
+        }
+
         const targetBroadcaster = broadcasters[data.language];
         if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
           targetBroadcaster.send(
@@ -248,6 +260,15 @@ wss.on("connection", (ws, req) => {
 
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
+
+    // 🔹 Si era listener, restar uno del contador
+    if (!ws.isBroadcaster && ws.language && listenersCount[ws.language] > 0) {
+      listenersCount[ws.language]--;
+      broadcastToAll({
+        type: "listeners-count",
+        listeners: listenersCount,
+      });
+    }
 
     if (ws.isBroadcaster && ws.language) {
       broadcasters[ws.language] = null;
