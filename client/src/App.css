@@ -7,7 +7,7 @@ body {
   font-family: "Inter", "Roboto", sans-serif;
   color: #fff;
   background: #1e1033;
-  background: linear-gradient(135deg, #b0b0b0, #1e1033);
+  background: linear-gradient(135deg, #7d7d7d, #18082f);
   background-attachment: fixed;
   min-height: 100vh;
 }
@@ -241,12 +241,13 @@ html {
   letter-spacing: 0.7px;
 }
 .listener-count {
-  display: block;
-  font-size: 0.65rem;
-  font-weight: 500;
-  margin-top: 2px;
-  color: #fff;
-  opacity: 0.85;
+  display: inline-block;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.listener-count.pop {
+  transform: scale(1.5);
+  color: #00ff00; /* color temporal durante el pop */
 }
 
 /* ---------- Etiqueta bajo cada botón ---------- */
@@ -289,11 +290,7 @@ html {
     height: 6px;
     bottom: -6px;
   }
-  .onair-badge {
-    font-size: 0.65rem;
-    top: -8px;
-    padding: 2px 6px;
-  }
+
   .btn-label {
     font-size: 0.75rem;
     margin-top: 6px;

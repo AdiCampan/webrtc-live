@@ -119,15 +119,16 @@ h2 {
 /* ───────────────────────────────
    🔴 Estado de transmisión activa
    ─────────────────────────────── */
-
+/* Broadcaster.css */
 .listener-count-broadcaster {
-  margin-left: 12px;
-  background: rgba(255, 47, 47, 0.85);
-  color: #fff;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  display: inline-block;
+  font-weight: bold;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.listener-count-broadcaster.pop {
+  transform: scale(1.5);
+  color: #00ff00; /* color temporal durante el pop */
 }
 
 .broadcast-btn.broadcasting {
@@ -161,6 +162,7 @@ h2 {
    🛑 Botón de parar transmisión
    ─────────────────────────────── */
 .stop-btn {
+  margin-top: 10px;
   width: 100%;
   max-width: 600px;
   border: none;
@@ -251,6 +253,7 @@ h2 {
    ─────────────────────────────── */
 
 .audio-visualizer {
+  background-color: #212121;
   width: 100%;
   max-height: 40%;
   border-radius: 12px;
@@ -276,24 +279,6 @@ h2 {
   .broadcast-btn.broadcasting img {
     width: 20px;
     height: 20px;
-  }
-
-  .stop-btn {
-    width: 100%;
-    max-width: 600px;
-    padding: 0.8rem 1rem;
-    font-size: 1rem;
-    font-weight: 600;
-    background: #ff1744;
-    color: #fff;
-    border: none;
-    border-radius: 1rem;
-    cursor: pointer;
-    transition: all 0.25s ease;
-  }
-
-  .stop-btn:hover {
-    background: #d32f2f;
   }
 
   .live-icon {

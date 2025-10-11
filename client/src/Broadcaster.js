@@ -50,6 +50,8 @@ function Broadcaster({
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState(null);
   const [listenerCounts, setListenerCounts] = useState({ es: 0, en: 0, ro: 0 });
+  const [prevCount, setPrevCount] = useState(0);
+  const [pop, setPop] = useState(false);
 
   const canvasRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -66,6 +68,17 @@ function Broadcaster({
       if (mics.length > 0) setSelectedDeviceId(mics[0].deviceId);
     });
   }, []);
+
+  useEffect(() => {
+    if (selectedLanguage) {
+      const current = listenerCounts[selectedLanguage] || 0;
+      if (current !== prevCount) {
+        setPop(true);
+        setTimeout(() => setPop(false), 200); // duración de la animación
+        setPrevCount(current);
+      }
+    }
+  }, [listenerCounts, selectedLanguage, prevCount]);
 
   // Manejar mensajes WebSocket
   useEffect(() => {
@@ -406,7 +419,9 @@ function Broadcaster({
                     ? "Inglés"
                     : "Rumano"}
                 </h3>
-                <span className="listener-count-broadcaster">
+                <span
+                  className={`listener-count-broadcaster ${pop ? "pop" : ""}`}
+                >
                   👂 {listenerCounts[selectedLanguage] || 0} oyentes
                 </span>
               </div>

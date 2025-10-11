@@ -45,6 +45,20 @@ function App() {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
 
+  const [prevCount, setPrevCount] = useState(0);
+  const [pop, setPop] = useState(false);
+
+  const currentCount = listenerCounts[activeLanguage] || 0;
+
+  useEffect(() => {
+    if (currentCount !== prevCount) {
+      setPop(true);
+      const timeout = setTimeout(() => setPop(false), 200);
+      setPrevCount(currentCount);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentCount, prevCount]);
+
   // URL WebSocket
   const signalingUrl = (() => {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
@@ -300,7 +314,7 @@ function App() {
                       <div className="onair-badge">
                         ONAIR
                         <span className="listener-count">
-                          {count > 0 ? `👂 ${count}` : ""}
+                          {currentCount > 0 ? `👂 ${currentCount}` : ""}
                         </span>
                       </div>
                     )}
