@@ -226,8 +226,6 @@ function Listener({ signalingServer, language, setRole }) {
         })
       );
     }
-
-    // lógica local para volver atrás
     setRole(null);
   };
 
