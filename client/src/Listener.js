@@ -216,8 +216,7 @@ function Listener({ signalingServer, language, setRole }) {
   }, [signalingServer, language]);
 
   const handleBack = () => {
-    // avisar al servidor que este listener deja de escuchar
-    if (signalingServer.readyState === WebSocket.OPEN) {
+    if (language && signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(
         JSON.stringify({
           type: "stop-listening",

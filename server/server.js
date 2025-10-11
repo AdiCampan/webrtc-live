@@ -279,8 +279,8 @@ wss.on("connection", (ws, req) => {
           type: "listeners-count",
           listeners: listenersCount,
         });
+        console.log(`🛑 Listener dejó de escuchar ${data.language}`);
       }
-      console.log(`🛑 Listener dejó de escuchar ${data.language}`);
     }
 
     // 🔹 Si era broadcaster, marcar como inactivo
