@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
@@ -33,7 +32,7 @@ const users = [
 ];
 
 // =====================================================
-// 🟢 ENDPOINTS API (ANTES de servir el frontend)
+// 🟢 ENDPOINTS API
 // =====================================================
 
 // Endpoint login
@@ -98,7 +97,7 @@ app.post("/next-event", (req, res) => {
 });
 
 // =====================================================
-// 🎨 Servir el frontend de React (DESPUÉS de las APIs)
+// 🎨 Servir el frontend de React
 // =====================================================
 const clientBuildPath = path.join(__dirname, "../client/build");
 app.use(express.static(clientBuildPath));
@@ -121,9 +120,6 @@ const broadcasters = {}; // { es: ws, en: ws, ro: ws }
 // 🔹 Estado global de transmisiones activas
 const activeBroadcasts = { es: false, en: false, ro: false };
 
-// 🔹 Contador de oyentes activos por idioma
-const listenersCount = { es: 0, en: 0, ro: 0 };
-
 // 🔹 Función para enviar un mensaje a todos los clientes conectados
 function broadcastToAll(message) {
   const payload = JSON.stringify(message);
@@ -140,11 +136,10 @@ function updateListenerCounts() {
       counts[client.language] = (counts[client.language] || 0) + 1;
     }
   });
-  Object.assign(listenersCount, counts);
-  broadcastToAll({ type: "listeners-count", listeners: listenersCount });
+  broadcastToAll({ type: "listeners-count", listeners: counts });
 }
 
-wss.on("connection", (ws, req) => {
+wss.on("connection", (ws) => {
   ws.id = uuidv4();
   ws.isBroadcaster = false;
   ws.language = null;
@@ -155,132 +150,127 @@ wss.on("connection", (ws, req) => {
   ws.send(
     JSON.stringify({ type: "active-broadcasts", active: activeBroadcasts })
   );
-  ws.send(
-    JSON.stringify({ type: "listeners-count", listeners: listenersCount })
-  );
+  updateListenerCounts();
 
   ws.on("message", (msg) => {
+    let data;
     try {
-      const data = JSON.parse(msg.toString());
-      console.log(`📩 Mensaje recibido de ${ws.id}:`, data);
+      data = JSON.parse(msg.toString());
+    } catch {
+      return;
+    }
+    console.log(`📩 Mensaje recibido de ${ws.id}:`, data);
 
-      // ==========================
-      // Registrar Broadcaster (con JWT)
-      // ==========================
-      if (data.type === "broadcaster" && data.language && data.token) {
-        const decoded = verifyToken(data.token);
-        if (!decoded || decoded.role !== "broadcaster") {
-          ws.send(
-            JSON.stringify({
-              type: "error",
-              message: "Token inválido o sin permisos",
-            })
-          );
-          return;
-        }
+    // ==========================
+    // Registrar Broadcaster (con JWT)
+    // ==========================
+    if (data.type === "broadcaster" && data.language && data.token) {
+      const decoded = verifyToken(data.token);
+      if (!decoded || decoded.role !== "broadcaster") {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "Token inválido o sin permisos",
+          })
+        );
+        return;
+      }
 
-        ws.isBroadcaster = true;
-        ws.language = data.language;
-        broadcasters[data.language] = ws;
-        activeBroadcasts[data.language] = true; // 🔹 marcar idioma como activo
+      ws.isBroadcaster = true;
+      ws.language = data.language;
+      broadcasters[data.language] = ws;
+      activeBroadcasts[data.language] = true;
 
+      console.log(`🎙️ Broadcaster autorizado para ${data.language}: ${ws.id}`);
+      broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
+      return;
+    }
+
+    // ==========================
+    // Detener transmisión manualmente
+    // ==========================
+    if (data.type === "stop-broadcast" && data.language) {
+      broadcasters[data.language] = null;
+      activeBroadcasts[data.language] = false;
+      console.log(`🛑 Transmisión detenida para ${data.language}`);
+      broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
+      return;
+    }
+
+    // ==========================
+    // Listener solicita oferta de un idioma
+    // ==========================
+    if (data.type === "request-offer" && data.language) {
+      ws.language = data.language;
+      updateListenerCounts();
+
+      const targetBroadcaster = broadcasters[data.language];
+      if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
+        targetBroadcaster.send(
+          JSON.stringify({
+            type: "request-offer",
+            clientId: ws.id,
+            language: data.language,
+          })
+        );
         console.log(
-          `🎙️ Broadcaster autorizado para ${data.language}: ${ws.id}`
+          `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
         );
-
-        // 🔹 Notificar a todos los clientes el nuevo estado
-        broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
-        return;
-      }
-
-      // ==========================
-      // Detener transmisión manualmente
-      // ==========================
-      if (data.type === "stop-broadcast" && data.language) {
-        broadcasters[data.language] = null;
-        activeBroadcasts[data.language] = false; // 🔹 marcar idioma como inactivo
-
-        console.log(`🛑 Transmisión detenida para ${data.language}`);
-        broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
-        return;
-      }
-
-      // ==========================
-      // Listener solicita oferta de un idioma
-      // ==========================
-      if (data.type === "request-offer" && data.language) {
-        ws.language = data.language; // Guardamos idioma del listener
-        updateListenerCounts(); // 🔹 actualizar conteo de oyentes
-
-        const targetBroadcaster = broadcasters[data.language];
-        if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
-          targetBroadcaster.send(
-            JSON.stringify({
-              type: "request-offer",
-              clientId: ws.id,
-              language: data.language,
-            })
-          );
-          console.log(
-            `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
-          );
-        } else {
-          console.warn(
-            `⚠️ No hay Broadcaster activo para idioma ${data.language}`
-          );
-        }
-        return;
-      }
-
-      // ==========================
-      // Reenvío estricto de mensajes (offer, answer, candidate)
-      // ==========================
-      if (["offer", "answer", "candidate"].includes(data.type)) {
-        const targetClient = [...wss.clients].find(
-          (client) => client.id === data.target
+      } else {
+        console.warn(
+          `⚠️ No hay Broadcaster activo para idioma ${data.language}`
         );
-        if (!targetClient || targetClient.readyState !== ws.OPEN) {
-          console.warn(`⚠️ Target no disponible para ${data.type}`);
-          return;
-        }
+      }
+      return;
+    }
 
-        if (
-          ws.language &&
-          targetClient.language &&
-          ws.language === targetClient.language
-        ) {
-          targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
-          console.log(
-            `➡️ ${data.type} (${ws.language}) reenviado de ${ws.id} a ${data.target}`
-          );
-        } else {
-          console.warn(
-            `⚠️ Idioma no coincide entre ${ws.id} y ${data.target}, mensaje ignorado`
-          );
-        }
+    // ==========================
+    // Listener deja de escuchar
+    // ==========================
+    if (data.type === "stop-listening" && data.language) {
+      if (ws.language === data.language) {
+        ws.language = null;
+        updateListenerCounts();
+        console.log(`🛑 Listener dejó de escuchar ${data.language}`);
+      }
+      return;
+    }
+
+    // ==========================
+    // Reenvío de offer/answer/candidate
+    // ==========================
+    if (["offer", "answer", "candidate"].includes(data.type)) {
+      const targetClient = [...wss.clients].find((c) => c.id === data.target);
+      if (!targetClient || targetClient.readyState !== ws.OPEN) {
+        console.warn(`⚠️ Target no disponible para ${data.type}`);
         return;
       }
-    } catch (err) {
-      console.error("❌ Error procesando mensaje:", err);
+
+      if (
+        ws.language &&
+        targetClient.language &&
+        ws.language === targetClient.language
+      ) {
+        targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
+        console.log(
+          `➡️ ${data.type} (${ws.language}) reenviado de ${ws.id} a ${data.target}`
+        );
+      } else {
+        console.warn(
+          `⚠️ Idioma no coincide entre ${ws.id} y ${data.target}, mensaje ignorado`
+        );
+      }
+      return;
     }
   });
 
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
 
-    // 🔹 Actualizar conteo de oyentes si era listener
+    // 🔹 Si era listener, actualizar conteo
     if (!ws.isBroadcaster && ws.language) {
+      ws.language = null;
       updateListenerCounts();
-    }
-    if (data.type === "stop-listening" && data.language) {
-      if (listenersCount[data.language] > 0) {
-        listenersCount[data.language]--;
-        broadcastToAll({
-          type: "listeners-count",
-          listeners: listenersCount,
-        });
-        console.log(`🛑 Listener dejó de escuchar ${data.language}`);
-      }
     }
 
     // 🔹 Si era broadcaster, marcar como inactivo
