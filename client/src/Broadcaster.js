@@ -42,6 +42,8 @@ function Broadcaster({
   token,
   setRole,
   onLanguageActive,
+  onBroadcastingState, // NUEVO callback para App.js
+  reconnecting = false, // NUEVO estado para mostrar reconexión
 }) {
   const peers = useRef({});
   const streamRef = useRef(null);
@@ -199,6 +201,7 @@ function Broadcaster({
     }
   };
 
+  // Cuando se inicia la transmisión:
   const startBroadcast = async (lang) => {
     const activeLang = lang || selectedLanguage || language;
 
@@ -309,9 +312,10 @@ function Broadcaster({
     }
 
     setBroadcasting(true);
+    if (onBroadcastingState) onBroadcastingState(true); // INFORMAR A APP
   };
 
-  // Detener transmisión y notificar al servidor
+  // Cuando se detiene la transmisión:
   const stopBroadcast = () => {
     if (broadcasting && selectedLanguage) {
       if (signalingServer.readyState === WebSocket.OPEN) {
@@ -333,6 +337,7 @@ function Broadcaster({
       audioCtxRef.current.close().catch(() => {});
 
     setBroadcasting(false);
+    if (onBroadcastingState) onBroadcastingState(false); // INFORMAR A APP
     setSelectedLanguage(null);
   };
 
@@ -348,6 +353,11 @@ function Broadcaster({
 
   return (
     <div className="broadcaster-container">
+      {reconnecting && (
+        <div className="reconnecting-overlay">
+          <span>Reconectando con el servidor...</span>
+        </div>
+      )}
       {!language && !selectedLanguage ? (
         <>
           <h3>🎙️ Selecciona el idioma que deseas transmitir</h3>
