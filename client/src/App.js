@@ -140,7 +140,7 @@ function App() {
               e
             );
           }
-        }, 1000); // Espera un poco más para asegurar que server esté listo
+        }, 2000); // Espera un poco más para asegurar que server esté listo
       }
     };
 
