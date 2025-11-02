@@ -111,6 +111,7 @@ function App() {
       console.log("✅ WebSocket conectado");
       reconnectAttemptRef.current = 0;
       startKeepalive();
+
       // Si usuario es broadcaster y estaba transmitiendo, re-registra
       if (
         role?.role === "broadcaster" &&
@@ -118,22 +119,28 @@ function App() {
         broadcastingRef.current &&
         lastBroadcastLangRef.current
       ) {
+        // Esperamos un poco más y verificamos que el socket siga abierto
         setTimeout(() => {
           try {
-            socket.send(
-              JSON.stringify({
-                type: "broadcaster",
-                language: lastBroadcastLangRef.current,
-                token: user.token,
-              })
-            );
+            if (socket.readyState === WebSocket.OPEN) {
+              socket.send(
+                JSON.stringify({
+                  type: "broadcaster",
+                  language: lastBroadcastLangRef.current,
+                  token: user.token,
+                })
+              );
+              console.log(
+                "🔄 Broadcaster re-registrado automáticamente después de reconexión"
+              );
+            }
           } catch (e) {
             console.warn(
               "No se pudo re-registrar broadcaster en reconexión",
               e
             );
           }
-        }, 500); // Pequeña espera para que server esté listo
+        }, 1000); // Espera un poco más para asegurar que server esté listo
       }
     };
 
@@ -142,7 +149,9 @@ function App() {
       console.warn("⚠️ WebSocket cerrado", ev);
       stopKeepalive();
       scheduleReconnect(url);
-      setWs(null);
+      // NO ponemos ws a null aquí - mantenemos el socket anterior visible
+      // para que el broadcaster no se oculte durante reconexión
+      // setWs(null); // ❌ Comentado para mantener UI activa
     };
 
     socket.onerror = (err) => {
@@ -239,7 +248,9 @@ function App() {
   }, []);
 
   // ----------------- UI -----------------
-  if (!ws)
+  // Solo mostrar pantalla de carga si NO hay socket Y NO estamos reconectando
+  // Si estamos reconectando, mantenemos la UI visible
+  if (!ws && !reconnecting)
     return (
       <div className="loading-screen">
         <div className="logo-pulse">⛪</div>
@@ -321,7 +332,8 @@ function App() {
                       <div className="onair-badge">
                         ONAIR
                         <span className="listener-count">
-                          {currentCount > 0 ? `👂 ${currentCount}` : ""}
+                          {/* {currentCount > 0 ? `👂 ${currentCount}` : ""} */}
+                          {count > 0 ? `👂 ${count}` : ""}
                         </span>
                       </div>
                     )}

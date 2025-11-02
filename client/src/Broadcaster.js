@@ -82,8 +82,36 @@ function Broadcaster({
     }
   }, [listenerCounts, selectedLanguage, prevCount]);
 
+  // Re-registrar automáticamente cuando el socket se reconecta
+  useEffect(() => {
+    if (
+      signalingServer &&
+      signalingServer.readyState === WebSocket.OPEN &&
+      broadcasting &&
+      selectedLanguage &&
+      token &&
+      !reconnecting
+    ) {
+      // Si estamos transmitiendo y el socket está abierto, asegurar que estamos registrados
+      try {
+        signalingServer.send(
+          JSON.stringify({
+            type: "broadcaster",
+            language: selectedLanguage,
+            token: token,
+          })
+        );
+        console.log("🔄 Broadcaster re-registrado (socket reconectado)");
+      } catch (e) {
+        console.warn("⚠️ Error re-registrando broadcaster:", e);
+      }
+    }
+  }, [signalingServer, broadcasting, selectedLanguage, token, reconnecting]);
+
   // Manejar mensajes WebSocket
   useEffect(() => {
+    if (!signalingServer) return; // No hacer nada si no hay socket
+
     const handleMessage = async (event) => {
       const data = JSON.parse(event.data);
       console.log("📩 Broadcaster recibió:", data);
@@ -142,10 +170,25 @@ function Broadcaster({
     };
 
     signalingServer.addEventListener("message", handleMessage);
-    return () => signalingServer.removeEventListener("message", handleMessage);
+    return () => {
+      if (signalingServer) {
+        signalingServer.removeEventListener("message", handleMessage);
+      }
+    };
   }, [signalingServer]);
 
   const createPeer = async (clientId) => {
+    if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
+      console.warn("⚠️ No hay socket disponible para crear peer, esperando...");
+      // Intentar de nuevo después de un breve delay
+      setTimeout(() => {
+        if (signalingServer && signalingServer.readyState === WebSocket.OPEN) {
+          createPeer(clientId);
+        }
+      }, 1000);
+      return;
+    }
+
     console.log("🆕 Creando PeerConnection para", clientId);
     const peer = new RTCPeerConnection(rtcConfig);
     peers.current[clientId] = peer;
@@ -166,9 +209,14 @@ function Broadcaster({
           await peer.restartIce();
           const offer = await peer.createOffer({ iceRestart: true });
           await peer.setLocalDescription(offer);
-          signalingServer.send(
-            JSON.stringify({ type: "offer", offer, target: clientId })
-          );
+          if (
+            signalingServer &&
+            signalingServer.readyState === WebSocket.OPEN
+          ) {
+            signalingServer.send(
+              JSON.stringify({ type: "offer", offer, target: clientId })
+            );
+          }
         } catch (err) {
           console.error("❌ restartIce falló, recreando Peer:", err);
           delete peers.current[clientId];
@@ -178,7 +226,11 @@ function Broadcaster({
     };
 
     peer.onicecandidate = (event) => {
-      if (event.candidate) {
+      if (
+        event.candidate &&
+        signalingServer &&
+        signalingServer.readyState === WebSocket.OPEN
+      ) {
         signalingServer.send(
           JSON.stringify({
             type: "candidate",
@@ -192,10 +244,25 @@ function Broadcaster({
     try {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      signalingServer.send(
-        JSON.stringify({ type: "offer", offer, target: clientId })
-      );
-      console.log("📤 Offer enviada a", clientId);
+      if (signalingServer && signalingServer.readyState === WebSocket.OPEN) {
+        signalingServer.send(
+          JSON.stringify({ type: "offer", offer, target: clientId })
+        );
+        console.log("📤 Offer enviada a", clientId);
+      } else {
+        console.warn("⚠️ Socket no disponible al crear offer, reintentando...");
+        setTimeout(() => {
+          if (
+            signalingServer &&
+            signalingServer.readyState === WebSocket.OPEN &&
+            peers.current[clientId]
+          ) {
+            signalingServer.send(
+              JSON.stringify({ type: "offer", offer, target: clientId })
+            );
+          }
+        }, 1000);
+      }
     } catch (err) {
       console.error("❌ Error creando oferta:", err);
     }
@@ -295,21 +362,39 @@ function Broadcaster({
       }
     }
 
-    if (signalingServer.readyState === WebSocket.OPEN) {
-      signalingServer.send(
-        JSON.stringify({ type: "broadcaster", language: activeLang, token })
-      );
-    } else {
-      signalingServer.addEventListener(
-        "open",
-        () => {
-          signalingServer.send(
-            JSON.stringify({ type: "broadcaster", language: activeLang, token })
-          );
-        },
-        { once: true }
-      );
-    }
+    // Función helper para enviar registro cuando el socket esté listo
+    const sendBroadcastRegistration = () => {
+      if (signalingServer && signalingServer.readyState === WebSocket.OPEN) {
+        signalingServer.send(
+          JSON.stringify({ type: "broadcaster", language: activeLang, token })
+        );
+        console.log("✅ Broadcaster registrado en servidor");
+      } else if (signalingServer) {
+        // Si el socket no está abierto, esperar a que se abra
+        const handleOpen = () => {
+          if (signalingServer.readyState === WebSocket.OPEN) {
+            signalingServer.send(
+              JSON.stringify({
+                type: "broadcaster",
+                language: activeLang,
+                token,
+              })
+            );
+            console.log(
+              "✅ Broadcaster registrado después de esperar a socket"
+            );
+          }
+          signalingServer.removeEventListener("open", handleOpen);
+        };
+        signalingServer.addEventListener("open", handleOpen, { once: true });
+      } else {
+        console.warn(
+          "⚠️ No hay socket disponible, se registrará cuando se reconecte"
+        );
+      }
+    };
+
+    sendBroadcastRegistration();
 
     setBroadcasting(true);
     if (onBroadcastingState) onBroadcastingState(true); // INFORMAR A APP
@@ -318,7 +403,7 @@ function Broadcaster({
   // Cuando se detiene la transmisión:
   const stopBroadcast = () => {
     if (broadcasting && selectedLanguage) {
-      if (signalingServer.readyState === WebSocket.OPEN) {
+      if (signalingServer && signalingServer.readyState === WebSocket.OPEN) {
         signalingServer.send(
           JSON.stringify({ type: "stop-broadcast", language: selectedLanguage })
         );
@@ -326,6 +411,8 @@ function Broadcaster({
       if (onLanguageActive) onLanguageActive(null);
     }
 
+    // ⚠️ IMPORTANTE: Solo detener el stream si realmente el usuario quiere parar
+    // NO detener durante microcortes de red
     if (streamRef.current)
       streamRef.current.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -341,9 +428,21 @@ function Broadcaster({
     setSelectedLanguage(null);
   };
 
-  // Cleanup
+  // Cleanup - solo cuando el componente se desmonta completamente
   useEffect(() => {
-    return () => stopBroadcast();
+    return () => {
+      // Solo limpiar si realmente estamos desmontando el componente
+      // No limpiar durante reconexiones
+      if (streamRef.current)
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      Object.values(peers.current).forEach((p) => p.close());
+      peers.current = {};
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed")
+        audioCtxRef.current.close().catch(() => {});
+      if (onBroadcastingState) onBroadcastingState(false);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
