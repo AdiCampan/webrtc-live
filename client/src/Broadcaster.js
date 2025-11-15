@@ -156,6 +156,24 @@ function Broadcaster({
           }
         }
       }
+      // ==========================
+      // Listener se desconectó → cerrar solo su PeerConnection
+      // ==========================
+      if (data.type === "stop-connection" && data.target) {
+        console.log("🛑 Cerrando PeerConnection del oyente:", data.target);
+
+        const peer = peers.current[data.target];
+        if (peer) {
+          try {
+            peer.close();
+            console.log("✔️ PeerConnection cerrada:", data.target);
+          } catch (err) {
+            console.warn("⚠️ Error al cerrar peer:", err);
+          }
+          delete peers.current[data.target];
+        }
+        return;
+      }
 
       // ==========================
       // Actualizar número de oyentes en tiempo real

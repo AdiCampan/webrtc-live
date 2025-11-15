@@ -232,6 +232,17 @@ wss.on("connection", (ws) => {
         ws.language = null;
         updateListenerCounts();
         console.log(`🛑 Listener dejó de escuchar ${data.language}`);
+
+        // 🔥 AVISAR AL BROADCASTER QUE CORTE EL peerConnection
+        const bc = broadcasters[data.language];
+        if (bc && bc.readyState === ws.OPEN) {
+          bc.send(
+            JSON.stringify({
+              type: "stop-connection",
+              target: ws.id,
+            })
+          );
+        }
       }
       return;
     }
@@ -267,7 +278,23 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
 
-    // 🔹 Si era listener, actualizar conteo
+    // 🔥 Si era un listener, avisar al broadcaster que cierre la PeerConnection
+    if (!ws.isBroadcaster && ws.language) {
+      const bc = broadcasters[ws.language];
+      if (bc && bc.readyState === ws.OPEN) {
+        bc.send(
+          JSON.stringify({
+            type: "stop-connection",
+            target: ws.id,
+          })
+        );
+        console.log(
+          `🔌 Indicando al broadcaster que cierre la conexión con ${ws.id}`
+        );
+      }
+    }
+
+    // 🔹 Actualizar conteo
     if (!ws.isBroadcaster && ws.language) {
       ws.language = null;
       updateListenerCounts();
