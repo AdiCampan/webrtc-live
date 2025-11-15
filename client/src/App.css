@@ -81,6 +81,22 @@ html {
   transform: translateY(-3px);
 }
 
+.event-saved-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #4caf50;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  font-size: 15px;
+  font-weight: bold;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
 /* TÍTULO CENTRAL */
 .center-column h1 {
   font-size: 2rem;

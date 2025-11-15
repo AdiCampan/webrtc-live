@@ -79,13 +79,41 @@ function App() {
   }, []);
 
   const handleSetNextEvent = async (newDate) => {
-    setNextEvent(newDate);
-    if (user?.token) {
-      await fetch("/next-event", {
+    if (!user?.token || role?.role !== "broadcaster") {
+      alert("Debes iniciar sesión como Broadcaster para modificar la fecha.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/next-event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: newDate, token: user.token }),
       });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        alert("❌ No se pudo actualizar la fecha. Inténtalo otra vez.");
+        return;
+      }
+
+      // 🔹 Solo actualiza la fecha si el servidor lo confirmó
+      setNextEvent(data.date);
+
+      // 🔹 Mensaje de éxito con animación
+      const box = document.createElement("div");
+      box.className = "event-saved-toast";
+      box.innerText = "📅 ¡Fecha guardada correctamente!";
+      document.body.appendChild(box);
+
+      setTimeout(() => {
+        box.style.opacity = "0";
+        setTimeout(() => box.remove(), 500);
+      }, 2000);
+    } catch (err) {
+      alert("⚠️ Error de conexión con el servidor.");
+      console.error(err);
     }
   };
 

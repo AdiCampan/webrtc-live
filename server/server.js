@@ -65,7 +65,8 @@ const verifyToken = (token) => {
 // =====================================================
 // 📅 Manejo de Next Event con persistencia en archivo
 // =====================================================
-const EVENT_FILE = "./nextEvent.json";
+const EVENT_FILE = path.join(__dirname, "nextEvent.json");
+
 let nextEventDate = "2025-10-15T12:00:00";
 
 try {
