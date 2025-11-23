@@ -4,9 +4,9 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
-import fs from "fs";
 import dotenv from "dotenv";
 import cors from "cors";
+import admin from 'firebase-admin';
 
 dotenv.config();
 
@@ -62,40 +62,62 @@ const verifyToken = (token) => {
   }
 };
 
-// =====================================================
-// 📅 Manejo de Next Event con persistencia en archivo
-// =====================================================
-const EVENT_FILE = path.join(__dirname, "nextEvent.json");
 
-let nextEventDate = "2025-10-15T12:00:00";
+// Inicializar Firebase Admin
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
-try {
-  if (fs.existsSync(EVENT_FILE)) {
-    const saved = JSON.parse(fs.readFileSync(EVENT_FILE, "utf-8"));
-    if (saved.date) nextEventDate = saved.date;
-  }
-} catch (err) {
-  console.error("⚠️ No se pudo leer el archivo de evento:", err);
-}
-
-// Obtener fecha actual del evento
-app.get("/next-event", (req, res) => {
-  res.json({ date: nextEventDate });
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
 });
 
-// Actualizar fecha del evento (solo broadcaster autorizado)
-app.post("/next-event", (req, res) => {
+const db = admin.firestore();
+console.log('✅ Conectado a Firebase Firestore');
+
+// Obtener fecha del evento desde Firestore
+app.get("/next-event", async (req, res) => {
+  try {
+    const docRef = db.collection('events').doc('next-event');
+    const doc = await docRef.get();
+    
+    if (doc.exists) {
+      const date = doc.data().date || "2025-10-15T12:00:00";
+      res.json({ date });
+    } else {
+      // Si no existe, crear con fecha por defecto
+      const defaultDate = "2025-10-15T12:00:00";
+      await docRef.set({ date: defaultDate, updatedAt: new Date() });
+      res.json({ date: defaultDate });
+    }
+  } catch (err) {
+    console.error("Error obteniendo fecha:", err);
+    res.json({ date: "2025-10-15T12:00:00" });
+  }
+});
+
+// Actualizar fecha en Firestore
+app.post("/next-event", async (req, res) => {
   const { date, token } = req.body;
   const decoded = verifyToken(token);
   if (!decoded || decoded.role !== "broadcaster") {
     return res.status(403).json({ error: "No autorizado" });
   }
 
-  nextEventDate = date;
-  fs.writeFileSync(EVENT_FILE, JSON.stringify({ date }, null, 2));
-  console.log("📅 Nueva fecha de evento:", date);
-  res.json({ success: true, date });
+  try {
+    const docRef = db.collection('events').doc('next-event');
+    await docRef.set({ 
+      date, 
+      updatedAt: admin.firestore.FieldValue.serverTimestamp() 
+    });
+    console.log("📅 Nueva fecha guardada en Firestore:", date);
+    res.json({ success: true, date });
+  } catch (err) {
+    console.error("Error guardando fecha:", err);
+    res.status(500).json({ error: "Error guardando fecha" });
+  }
 });
+
+
+
 
 // =====================================================
 // 🎨 Servir el frontend de React
