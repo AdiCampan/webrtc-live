@@ -61,6 +61,7 @@ function Broadcaster({
   const dataFreqRef = useRef(null);
   const dataWaveRef = useRef(null);
   const animRef = useRef(null);
+  const heartbeatRef = useRef(null); // 🔹 Heartbeat para mantener registro activo
 
   // Enumerar micrófonos
   useEffect(() => {
@@ -286,6 +287,41 @@ function Broadcaster({
     }
   };
 
+  // 🔹 Heartbeat para mantener registro activo
+  const startHeartbeat = () => {
+    if (heartbeatRef.current) return;
+    
+    heartbeatRef.current = setInterval(() => {
+      if (
+        broadcasting &&
+        selectedLanguage &&
+        token &&
+        signalingServer &&
+        signalingServer.readyState === WebSocket.OPEN
+      ) {
+        try {
+          signalingServer.send(
+            JSON.stringify({
+              type: "broadcaster",
+              language: selectedLanguage,
+              token: token,
+            })
+          );
+          console.log("💓 Heartbeat: Broadcaster re-registrado");
+        } catch (e) {
+          console.warn("⚠️ Error en heartbeat:", e);
+        }
+      }
+    }, 10000); // Cada 10 segundos
+  };
+
+  const stopHeartbeat = () => {
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+  };
+
   // Cuando se inicia la transmisión:
   const startBroadcast = async (lang) => {
     const activeLang = lang || selectedLanguage || language;
@@ -415,11 +451,13 @@ function Broadcaster({
     sendBroadcastRegistration();
 
     setBroadcasting(true);
+    startHeartbeat(); // 🔹 Iniciar heartbeat para mantener registro
     if (onBroadcastingState) onBroadcastingState(true); // INFORMAR A APP
   };
 
   // Cuando se detiene la transmisión:
   const stopBroadcast = () => {
+    stopHeartbeat(); // 🔹 Detener heartbeat
     if (broadcasting && selectedLanguage) {
       if (signalingServer && signalingServer.readyState === WebSocket.OPEN) {
         signalingServer.send(
@@ -451,6 +489,7 @@ function Broadcaster({
     return () => {
       // Solo limpiar si realmente estamos desmontando el componente
       // No limpiar durante reconexiones
+      stopHeartbeat(); // 🔹 Detener heartbeat
       if (streamRef.current)
         streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
