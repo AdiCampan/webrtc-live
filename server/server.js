@@ -47,7 +47,7 @@ app.post("/login", (req, res) => {
   const token = jwt.sign(
     { username: user.username, role: user.role },
     SECRET_KEY,
-    { expiresIn: "2h" }
+    { expiresIn: "12h" }
   );
 
   res.json({ token, role: user.role });
@@ -323,12 +323,14 @@ wss.on("connection", (ws) => {
       updateListenerCounts();
     }
 
-    // 🔹 Si era broadcaster, marcar como inactivo
+    // 🔹 Si era broadcaster, marcar como inactivo SOLO si es el actual
     if (ws.isBroadcaster && ws.language) {
-      broadcasters[ws.language] = null;
-      activeBroadcasts[ws.language] = false;
-      console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
-      broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
+      if (broadcasters[ws.language] === ws) {
+        broadcasters[ws.language] = null;
+        activeBroadcasts[ws.language] = false;
+        console.log(`⚠️ Broadcaster de ${ws.language} desconectado`);
+        broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
+      }
     }
   });
 });
