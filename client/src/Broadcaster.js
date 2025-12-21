@@ -376,8 +376,14 @@ function Broadcaster({
 
           const ctx = canvas.getContext("2d");
           const rect = canvas.getBoundingClientRect();
-          canvas.width = rect.width;
-          canvas.height = rect.height;
+          
+          // 🔹 OPTIMIZACIÓN: Solo redimensionar si el tamaño ha cambiado
+          // Redimensionar el canvas en cada frame (60fps) es muy costoso y causa glitches
+          if (canvas.width !== rect.width || canvas.height !== rect.height) {
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+          }
+          
           const width = canvas.width;
           const height = canvas.height;
 
