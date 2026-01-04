@@ -240,22 +240,26 @@ function Listener({ signalingServer, language, setRole }) {
     try {
       // 1. Reproducir silencio (Hack Audio Context - Elemento en DOM)
       if (silenceAudioRef.current) {
+        silenceAudioRef.current.load(); // Forzar recarga
         silenceAudioRef.current.loop = true;
         await silenceAudioRef.current.play().catch(e => {
           console.warn("Error play audio hack", e);
-          setDebugInfo(prev => prev + " | Err Audio: " + e.message);
+          setDebugInfo(prev => prev + " | Err Audio: " + e.message + " (" + (silenceAudioRef.current.error ? silenceAudioRef.current.error.code : 'no-error') + ")");
         });
       }
 
       // 2. Reproducir Video Dummy (Hack Background Persistence - Elemento en DOM)
       if (videoHackRef.current) {
+        videoHackRef.current.load(); // Forzar recarga
         videoHackRef.current.muted = true;
         videoHackRef.current.loop = true;
         await videoHackRef.current.play().catch(e => {
           console.warn("Error play video hack", e);
-          setDebugInfo(prev => prev + " | Err Video: " + e.message);
+          setDebugInfo(prev => prev + " | Err Video: " + e.message + " (" + (videoHackRef.current.error ? videoHackRef.current.error.code : 'no-error') + ")");
         });
       }
+
+      // ... rest of mediaSession logic
 
       // 3. Configurar Media Session de forma robusta
       if ('mediaSession' in navigator) {
@@ -316,17 +320,19 @@ function Listener({ signalingServer, language, setRole }) {
       */}
       <audio
         ref={silenceAudioRef}
-        src="/silence.mp3"
         loop
+        preload="auto"
         style={{ display: 'none' }}
-      />
+      >
+        <source src="/silence.mp3" type="audio/mpeg" />
+      </audio>
 
       <video
         ref={videoHackRef}
         playsInline
         muted
         loop
-        src="/screenshare.webm"
+        preload="auto"
         style={{
           position: "fixed",
           top: 0,
@@ -337,7 +343,9 @@ function Listener({ signalingServer, language, setRole }) {
           pointerEvents: "none",
           zIndex: -1
         }}
-      />
+      >
+        <source src="/screenshare.webm" type="video/webm" />
+      </video>
 
       {/* Audio de WebRTC real */}
       <audio
