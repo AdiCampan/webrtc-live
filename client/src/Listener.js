@@ -238,7 +238,31 @@ function Listener({ signalingServer, language, setRole }) {
       // Base64 de un MP3 de silencio de 0.1s
       const silence = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjYwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA";
       const audio = new Audio(silence);
+      audio.loop = true; // Loop infinito
       await audio.play();
+
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: 'Traducción en Vivo',
+          artist: 'EBEN-EZER Media',
+          album: 'Culto en Vivo',
+          artwork: [
+            { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/logo512.png', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+
+        navigator.mediaSession.setActionHandler('play', () => {
+          audio.play();
+          if (audioRef.current) audioRef.current.play();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          // No permitimos pausar realmente para no perder la conexión, 
+          // o implementamos lógica de stop si se desea.
+          // Por ahora, solo aseguramos que el contexto siga vivo.
+          audio.play();
+        });
+      }
 
       setIsStarted(true);
     } catch (err) {
