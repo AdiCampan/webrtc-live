@@ -37,6 +37,7 @@ function Listener({ signalingServer, language, setRole }) {
   const audioRef = useRef(null);
   const canvasRef = useRef(null);
   const [status, setStatus] = useState("idle");
+  const [isStarted, setIsStarted] = useState(false);
   const candidateQueueRef = useRef([]);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -105,7 +106,7 @@ function Listener({ signalingServer, language, setRole }) {
   };
 
   useEffect(() => {
-    if (!signalingServer) return;
+    if (!signalingServer || !isStarted) return;
 
     const handleMessage = async (event) => {
       let data;
@@ -122,7 +123,7 @@ function Listener({ signalingServer, language, setRole }) {
         if (pcRef.current) {
           try {
             pcRef.current.close();
-          } catch {}
+          } catch { }
           pcRef.current = null;
         }
 
@@ -133,7 +134,7 @@ function Listener({ signalingServer, language, setRole }) {
           const stream = ev.streams[0];
           if (audioRef.current) {
             audioRef.current.srcObject = stream;
-            audioRef.current.play().catch(() => {});
+            audioRef.current.play().catch(() => { });
           }
           setupAudioVisualizer(stream);
           setStatus("connected");
@@ -192,10 +193,10 @@ function Listener({ signalingServer, language, setRole }) {
 
     signalingServer.addEventListener("message", handleMessage);
     return () => signalingServer.removeEventListener("message", handleMessage);
-  }, [signalingServer]);
+  }, [signalingServer, isStarted]);
 
   useEffect(() => {
-    if (!signalingServer) return;
+    if (!signalingServer || !isStarted) return;
     if (signalingServer.readyState === WebSocket.OPEN) {
       signalingServer.send(JSON.stringify({ type: "request-offer", language }));
     } else {
@@ -215,7 +216,7 @@ function Listener({ signalingServer, language, setRole }) {
       audioContextRef.current?.close();
       audioContextRef.current = null;
     };
-  }, [signalingServer, language]);
+  }, [signalingServer, language, isStarted]);
 
   const handleBack = () => {
     if (language && signalingServer.readyState === WebSocket.OPEN) {
@@ -228,7 +229,65 @@ function Listener({ signalingServer, language, setRole }) {
       );
     }
     setRole(null);
+    setIsStarted(false);
   };
+
+  const handleStart = async () => {
+    try {
+      // Reproducir silencio para desbloquear audio en iOS/Android
+      // Base64 de un MP3 de silencio de 0.1s
+      const silence = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjYwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA";
+      const audio = new Audio(silence);
+      await audio.play();
+
+      setIsStarted(true);
+    } catch (err) {
+      console.error("Error iniciando audio:", err);
+      // Aún si falla el silencio, intentamos iniciar
+      setIsStarted(true);
+    }
+  };
+
+  if (!isStarted) {
+    return (
+      <div className="listener-wrapper">
+        <h3 className="listener-title">
+          🎧 Escuchando en{" "}
+          {language === "es"
+            ? "Español"
+            : language === "en"
+              ? "Inglés"
+              : "Rumano"}
+        </h3>
+        <div className="start-container" style={{ textAlign: "center", padding: "40px" }}>
+          <button
+            className="btn-start-audio"
+            onClick={handleStart}
+            style={{
+              padding: "20px 40px",
+              fontSize: "24px",
+              background: "#2ecc71",
+              color: "white",
+              border: "none",
+              borderRadius: "50px",
+              cursor: "pointer",
+              boxShadow: "0 4px 15px rgba(46, 204, 113, 0.4)",
+              transition: "transform 0.2s"
+            }}
+          >
+            🔊 Tocar para Activar Audio
+          </button>
+          <p style={{ marginTop: "20px", color: "#666" }}>
+            Necesario para escuchar en segundo plano
+          </p>
+          <button className="btn-back" onClick={() => handleBack()} style={{ marginTop: "20px" }}>
+            ← Volver
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="listener-wrapper">
       <h3 className="listener-title">
@@ -236,11 +295,11 @@ function Listener({ signalingServer, language, setRole }) {
         {language === "es"
           ? "Español"
           : language === "en"
-          ? "Inglés"
-          : "Rumano"}
+            ? "Inglés"
+            : "Rumano"}
       </h3>
 
-      <audio ref={audioRef} controls autoPlay />
+      <audio ref={audioRef} controls autoPlay playsInline />
 
       <canvas
         ref={canvasRef}
@@ -273,7 +332,7 @@ function Listener({ signalingServer, language, setRole }) {
             if (pcRef.current) {
               try {
                 pcRef.current.close();
-              } catch {}
+              } catch { }
               pcRef.current = null;
             }
             cancelAnimationFrame(animationRef.current);
