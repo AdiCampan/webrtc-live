@@ -41,10 +41,12 @@ function Listener({ signalingServer, language, setRole }) {
   const [status, setStatus] = useState("idle");
   const [isStarted, setIsStarted] = useState(false);
   const [debugInfo, setDebugInfo] = useState(""); // Info para debuggear en movil
+  const [isActivating, setIsActivating] = useState(false); // Estado de cargando al iniciar
   const candidateQueueRef = useRef([]);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const dataArrayRef = useRef(null);
+  const wakeLockRef = useRef(null); // Referencia para el Wake Lock
   const animationRef = useRef(null);
   const [clientId] = useState(uuidv4());
 
@@ -236,70 +238,68 @@ function Listener({ signalingServer, language, setRole }) {
   };
 
   const handleStart = async () => {
-    setDebugInfo("Intentando activar...");
+    if (isActivating) return;
+    setIsActivating(true);
+    setDebugInfo("Activando...");
+
     try {
-      // 1. Reproducir silencio (Hack Audio Context - Elemento en DOM)
-      if (silenceAudioRef.current) {
-        silenceAudioRef.current.load(); // Forzar recarga
-        silenceAudioRef.current.loop = true;
-        await silenceAudioRef.current.play().catch(e => {
-          console.warn("Error play audio hack", e);
-          setDebugInfo(prev => prev + " | Err Audio: " + e.message + " (" + (silenceAudioRef.current.error ? silenceAudioRef.current.error.code : 'no-error') + ")");
-        });
-      }
-
-      // 2. Reproducir Video Dummy (Hack Background Persistence - Elemento en DOM)
-      if (videoHackRef.current) {
-        videoHackRef.current.load(); // Forzar recarga
-        videoHackRef.current.muted = true;
-        videoHackRef.current.loop = true;
-        await videoHackRef.current.play().catch(e => {
-          console.warn("Error play video hack", e);
-          setDebugInfo(prev => prev + " | Err Video: " + e.message + " (" + (videoHackRef.current.error ? videoHackRef.current.error.code : 'no-error') + ")");
-        });
-      }
-
-      // ... rest of mediaSession logic
-
-      // 3. Configurar Media Session de forma robusta
-      if ('mediaSession' in navigator) {
+      // 1. Wake Lock API: Mantener pantalla/sistema despierto
+      if ('wakeLock' in navigator) {
         try {
-          navigator.mediaSession.metadata = new MediaMetadata({
-            title: 'Traducción en Vivo (EBEN-EZER)',
-            artist: 'Transmisión Activa',
-            album: language === 'es' ? 'Español' : language === 'en' ? 'Inglés' : 'Rumano',
-            artwork: [
-              { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
-              { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
-            ]
-          });
-
-          navigator.mediaSession.playbackState = 'playing';
-
-          navigator.mediaSession.setActionHandler('play', () => {
-            if (silenceAudioRef.current) silenceAudioRef.current.play().catch(() => { });
-            if (videoHackRef.current) videoHackRef.current.play().catch(() => { });
-            if (audioRef.current) audioRef.current.play().catch(() => { });
-            navigator.mediaSession.playbackState = 'playing';
-          });
-
-          navigator.mediaSession.setActionHandler('pause', () => {
-            // Ignoramos la pausa para evitar desconexiones en segundo plano
-            navigator.mediaSession.playbackState = 'playing';
-          });
-
-          setDebugInfo(prev => prev + " | MediaSession OK");
-        } catch (msErr) {
-          console.error("MediaSession Err:", msErr);
-          setDebugInfo(prev => prev + " | Err MS: " + msErr.message);
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+          setDebugInfo(prev => prev + " | WakeLock OK");
+        } catch (wlErr) {
+          console.warn("Wake Lock Error:", wlErr);
         }
+      }
+
+      // 2. Reproducir medios (Hack)
+      // No llamamos a .load() aquí para evitar interrupciones si ya se está cargando
+      const audioPromise = silenceAudioRef.current ? silenceAudioRef.current.play() : Promise.resolve();
+      const videoPromise = videoHackRef.current ? videoHackRef.current.play() : Promise.resolve();
+
+      await Promise.allSettled([audioPromise, videoPromise]).then(results => {
+        results.forEach((res, i) => {
+          if (res.status === 'rejected') {
+            const type = i === 0 ? "Audio" : "Video";
+            setDebugInfo(prev => prev + ` | Err ${type}: ${res.reason.message.substring(0, 20)}`);
+          }
+        });
+      });
+
+      // 3. Media Session
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: 'Traducción en Vivo (EBEN-EZER)',
+          artist: 'Transmisión Activa',
+          album: language === 'es' ? 'Español' : language === 'en' ? 'Inglés' : 'Rumano',
+          artwork: [
+            { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+
+        navigator.mediaSession.playbackState = 'playing';
+
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (silenceAudioRef.current) silenceAudioRef.current.play().catch(() => { });
+          if (audioRef.current) audioRef.current.play().catch(() => { });
+          navigator.mediaSession.playbackState = 'playing';
+        });
+
+        navigator.mediaSession.setActionHandler('pause', () => {
+          navigator.mediaSession.playbackState = 'playing';
+        });
+        setDebugInfo(prev => prev + " | MediaSession OK");
       }
 
       setIsStarted(true);
     } catch (err) {
-      console.error("Error iniciando hacks:", err);
+      console.error("Global Error starting:", err);
       setDebugInfo(prev => prev + " | Global Err: " + err.message);
       setIsStarted(true);
+    } finally {
+      setIsActivating(false);
     }
   };
 
@@ -335,14 +335,16 @@ function Listener({ signalingServer, language, setRole }) {
         preload="auto"
         style={{
           position: "fixed",
-          top: 0,
-          left: 0,
-          width: "1px",
-          height: "1px",
-          opacity: 0.01,
+          bottom: "10px",
+          right: "10px",
+          width: "10px",
+          height: "10px",
+          opacity: 0.05,
           pointerEvents: "none",
-          zIndex: -1
+          zIndex: 9999,
+          background: "black"
         }}
+        onPlaying={() => setDebugInfo(prev => prev + " | Video PLAY")}
       >
         <source src="/screenshare.webm" type="video/webm" />
       </video>
@@ -360,19 +362,21 @@ function Listener({ signalingServer, language, setRole }) {
           <button
             className="btn-start-audio"
             onClick={handleStart}
+            disabled={isActivating}
             style={{
               padding: "20px 40px",
               fontSize: "24px",
-              background: "#2ecc71",
+              background: isActivating ? "#95a5a6" : "#2ecc71",
               color: "white",
               border: "none",
               borderRadius: "50px",
-              cursor: "pointer",
+              cursor: isActivating ? "default" : "pointer",
               boxShadow: "0 4px 15px rgba(46, 204, 113, 0.4)",
-              transition: "transform 0.2s"
+              transition: "all 0.2s",
+              opacity: isActivating ? 0.7 : 1
             }}
           >
-            🔊 Tocar para Activar Audio
+            {isActivating ? "⌛ Activando..." : "🔊 Tocar para Activar Audio"}
           </button>
           <p style={{ marginTop: "20px", color: "#666" }}>
             Necesario para escuchar en segundo plano
