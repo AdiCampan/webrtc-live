@@ -35,6 +35,7 @@ const rtcConfig = {
 function Listener({ signalingServer, language, setRole }) {
   const pcRef = useRef(null);
   const audioRef = useRef(null);
+  const videoHackRef = useRef(null); // Referencia para el video dummy
   const canvasRef = useRef(null);
   const [status, setStatus] = useState("idle");
   const [isStarted, setIsStarted] = useState(false);
@@ -234,13 +235,20 @@ function Listener({ signalingServer, language, setRole }) {
 
   const handleStart = async () => {
     try {
-      // Reproducir silencio para desbloquear audio en iOS/Android
-      // Base64 de un MP3 de silencio de 0.1s
+      // 1. Reproducir silencio (Hack Audio Context)
       const silence = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjYwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA";
       const audio = new Audio(silence);
-      audio.loop = true; // Loop infinito
-      await audio.play();
+      audio.loop = true;
+      await audio.play().catch(e => console.warn("Error play audio hack", e));
 
+      // 2. Reproducir Video Dummy (Hack Background Persistence)
+      // WebM negro mínimo 1px
+      if (videoHackRef.current) {
+        videoHackRef.current.volume = 0; // Asegurar silencio
+        await videoHackRef.current.play().catch(e => console.warn("Error play video hack", e));
+      }
+
+      // 3. Configurar Media Session
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: 'Traducción en Vivo',
@@ -252,22 +260,21 @@ function Listener({ signalingServer, language, setRole }) {
           ]
         });
 
+        // Handlers dummy para mantener la sesion viva
         navigator.mediaSession.setActionHandler('play', () => {
-          audio.play();
+          if (videoHackRef.current) videoHackRef.current.play();
           if (audioRef.current) audioRef.current.play();
         });
         navigator.mediaSession.setActionHandler('pause', () => {
-          // No permitimos pausar realmente para no perder la conexión, 
-          // o implementamos lógica de stop si se desea.
-          // Por ahora, solo aseguramos que el contexto siga vivo.
-          audio.play();
+          // Ignoramos pausa para evitar desconexión
+          if (videoHackRef.current) videoHackRef.current.play();
         });
       }
 
       setIsStarted(true);
     } catch (err) {
-      console.error("Error iniciando audio:", err);
-      // Aún si falla el silencio, intentamos iniciar
+      console.error("Error iniciando hacks:", err);
+      // Continuamos igual para no bloquear al usuario
       setIsStarted(true);
     }
   };
@@ -323,7 +330,37 @@ function Listener({ signalingServer, language, setRole }) {
             : "Rumano"}
       </h3>
 
-      <audio ref={audioRef} controls autoPlay playsInline />
+      <audio ref={audioRef} controls autoPlay playsInline style={{ display: 'none' }} />
+
+      {/* 
+        VIDEO DUMMY HACK:
+        Video invisible pero renderizado (opacity 0) para forzar modo background en Android/iOS 
+      */}
+      <video
+        ref={videoHackRef}
+        playsInline
+        autoPlay
+        muted
+        loop
+        src="data:video/webm;base64,GkXfo0AgQoaBAUL3gQFC8oEEQvOBCEKCQAR3ZWJtQoeBAkKFgQIYX4BNQi1jxPpYt4EEd2VibUKHgQOVgouBCCHHgQKMgpOBACTINwEBQ7Z1AQAAAAAAAHunW4IvQeBninhF67jtI97TS124qF3bC0W+u4KihYECQoWBAIW1gQJChYEAm5yBAlWFA4KBAx8A64Y="
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "1px",
+          height: "1px",
+          opacity: 0.01,
+          pointerEvents: "none",
+          zIndex: -1
+        }}
+      />
+
+      {/* Controles de audio customizados para visualizar estado */}
+      <div style={{ padding: '10px', background: '#222', borderRadius: '8px', marginBottom: '10px' }}>
+        <p style={{ margin: 0, fontSize: '0.9em', color: '#aaa' }}>
+          {status === 'connected' ? '🔊 Audio Activo (WebRTC)' : 'Esperando conexión...'}
+        </p>
+      </div>
 
       <canvas
         ref={canvasRef}
