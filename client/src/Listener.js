@@ -236,21 +236,21 @@ function Listener({ signalingServer, language, setRole }) {
   };
 
   const handleStart = async () => {
-    setDebugInfo("Iniciando...");
+    setDebugInfo("Intentando activar...");
     try {
-      // 1. Reproducir silencio (Hack Audio Context - Archivo real)
-      if (!silenceAudioRef.current) {
-        silenceAudioRef.current = new Audio("/silence.mp3?v=" + Date.now());
+      // 1. Reproducir silencio (Hack Audio Context - Elemento en DOM)
+      if (silenceAudioRef.current) {
         silenceAudioRef.current.loop = true;
+        await silenceAudioRef.current.play().catch(e => {
+          console.warn("Error play audio hack", e);
+          setDebugInfo(prev => prev + " | Err Audio: " + e.message);
+        });
       }
-      await silenceAudioRef.current.play().catch(e => {
-        console.warn("Error play audio hack", e);
-        setDebugInfo(prev => prev + " | Err Audio: " + e.message);
-      });
 
-      // 2. Reproducir Video Dummy (Hack Background Persistence - Archivo real)
+      // 2. Reproducir Video Dummy (Hack Background Persistence - Elemento en DOM)
       if (videoHackRef.current) {
-        videoHackRef.current.volume = 0;
+        videoHackRef.current.muted = true;
+        videoHackRef.current.loop = true;
         await videoHackRef.current.play().catch(e => {
           console.warn("Error play video hack", e);
           setDebugInfo(prev => prev + " | Err Video: " + e.message);
@@ -266,22 +266,21 @@ function Listener({ signalingServer, language, setRole }) {
             album: language === 'es' ? 'Español' : language === 'en' ? 'Inglés' : 'Rumano',
             artwork: [
               { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
-              { src: '/logo512.png', sizes: '512x512', type: 'image/png' }
+              { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
             ]
           });
 
           navigator.mediaSession.playbackState = 'playing';
 
           navigator.mediaSession.setActionHandler('play', () => {
-            if (silenceAudioRef.current) silenceAudioRef.current.play();
-            if (videoHackRef.current) videoHackRef.current.play();
-            if (audioRef.current) audioRef.current.play();
+            if (silenceAudioRef.current) silenceAudioRef.current.play().catch(() => { });
+            if (videoHackRef.current) videoHackRef.current.play().catch(() => { });
+            if (audioRef.current) audioRef.current.play().catch(() => { });
             navigator.mediaSession.playbackState = 'playing';
           });
 
           navigator.mediaSession.setActionHandler('pause', () => {
-            // No permitimos pausar realmente para no perder la conexión
-            if (silenceAudioRef.current) silenceAudioRef.current.play();
+            // Ignoramos la pausa para evitar desconexiones en segundo plano
             navigator.mediaSession.playbackState = 'playing';
           });
 
@@ -300,17 +299,55 @@ function Listener({ signalingServer, language, setRole }) {
     }
   };
 
-  if (!isStarted) {
-    return (
-      <div className="listener-wrapper">
-        <h3 className="listener-title">
-          🎧 Escuchando en{" "}
-          {language === "es"
-            ? "Español"
-            : language === "en"
-              ? "Inglés"
-              : "Rumano"}
-        </h3>
+  return (
+    <div className="listener-wrapper">
+      <h3 className="listener-title">
+        🎧 Escuchando en{" "}
+        {language === "es"
+          ? "Español"
+          : language === "en"
+            ? "Inglés"
+            : "Rumano"}
+      </h3>
+
+      {/* 
+        HACKS DE AUDIO Y VIDEO: 
+        Deben estar siempre en el DOM (pero ocultos) para que handleStart pueda activarlos 
+      */}
+      <audio
+        ref={silenceAudioRef}
+        src="/silence.mp3"
+        loop
+        style={{ display: 'none' }}
+      />
+
+      <video
+        ref={videoHackRef}
+        playsInline
+        muted
+        loop
+        src="/screenshare.webm"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "1px",
+          height: "1px",
+          opacity: 0.01,
+          pointerEvents: "none",
+          zIndex: -1
+        }}
+      />
+
+      {/* Audio de WebRTC real */}
+      <audio
+        ref={audioRef}
+        autoPlay
+        playsInline
+        style={{ display: 'none' }}
+      />
+
+      {!isStarted ? (
         <div className="start-container" style={{ textAlign: "center", padding: "40px" }}>
           <button
             className="btn-start-audio"
@@ -332,99 +369,71 @@ function Listener({ signalingServer, language, setRole }) {
           <p style={{ marginTop: "20px", color: "#666" }}>
             Necesario para escuchar en segundo plano
           </p>
+          {debugInfo && <div style={{ fontSize: '10px', color: '#888', marginTop: '10px' }}>{debugInfo}</div>}
           <button className="btn-back" onClick={() => handleBack()} style={{ marginTop: "20px" }}>
             ← Volver
           </button>
         </div>
-      </div>
-    );
-  }
+      ) : (
+        <>
+          {/* Info de Debug para el usuario */}
+          {debugInfo && (
+            <div style={{ fontSize: '10px', color: '#555', marginBottom: '5px' }}>
+              {debugInfo}
+            </div>
+          )}
 
-  return (
-    <div className="listener-wrapper">
-      <h3 className="listener-title">
-        🎧 Escuchando en{" "}
-        {language === "es"
-          ? "Español"
-          : language === "en"
-            ? "Inglés"
-            : "Rumano"}
-      </h3>
+          {/* Controles de audio customizados para visualizar estado */}
+          <div style={{ padding: '10px', background: '#222', borderRadius: '8px', marginBottom: '10px' }}>
+            <p style={{ margin: 0, fontSize: '0.9em', color: '#aaa' }}>
+              {status === 'connected' ? '🔊 Audio en Vivo Activo' : '📡 Sincronizando...'}
+            </p>
+          </div>
 
-      <audio ref={audioRef} controls autoPlay playsInline style={{ display: 'none' }} />
+          <canvas
+            ref={canvasRef}
+            width={300}
+            height={80}
+            style={{
+              width: "100%",
+              height: "80px",
+              background: "#111",
+              borderRadius: "12px",
+              marginTop: "10px",
+            }}
+          ></canvas>
 
-      {/* 
-        VIDEO DUMMY HACK:
-        Video invisible pero renderizado (opacity 0) para forzar modo background en Android/iOS 
-      */}
-      <video
-        ref={videoHackRef}
-        playsInline
-        autoPlay
-        muted
-        loop
-        src="data:video/webm;base64,GkXfo0AgQoaBAUL3gQFC8oEEQvOBCEKCQAR3ZWJtQoeBAkKFgQIYX4BNQi1jxPpYt4EEd2VibUKHgQOVgouBCCHHgQKMgpOBACTINwEBQ7Z1AQAAAAAAAHunW4IvQeBninhF67jtI97TS124qF3bC0W+u4KihYECQoWBAIW1gQJChYEAm5yBAlWFA4KBAx8A64Y="
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "1px",
-          height: "1px",
-          opacity: 0.01,
-          pointerEvents: "none",
-          zIndex: -1
-        }}
-      />
+          <div className={`listener-status ${status}`}>
+            {status === "idle" && <span>🛑 No hay transmisión activa</span>}
+            {status === "requesting" && <span>📡 Solicitando conexión...</span>}
+            {status === "connecting" && <span>🔄 Conectando al transmisor...</span>}
+            {status === "connected" && <span>✅ Transmisión en vivo</span>}
+            {status === "error" && <span>⚠️ Error de conexión</span>}
+          </div>
 
-      {/* Controles de audio customizados para visualizar estado */}
-      <div style={{ padding: '10px', background: '#222', borderRadius: '8px', marginBottom: '10px' }}>
-        <p style={{ margin: 0, fontSize: '0.9em', color: '#aaa' }}>
-          {status === 'connected' ? '🔊 Audio Activo (WebRTC)' : 'Esperando conexión...'}
-        </p>
-      </div>
-
-      <canvas
-        ref={canvasRef}
-        width={300}
-        height={80}
-        style={{
-          width: "100%",
-          height: "80px",
-          background: "#111",
-          borderRadius: "12px",
-          marginTop: "10px",
-        }}
-      ></canvas>
-
-      <div className={`listener-status ${status}`}>
-        {status === "idle" && <span>🛑 No hay transmisión activa</span>}
-        {status === "requesting" && <span>📡 Solicitando conexión...</span>}
-        {status === "connecting" && <span>🔄 Conectando al transmisor...</span>}
-        {status === "connected" && <span>✅ Transmisión en vivo</span>}
-        {status === "error" && <span>⚠️ Error de conexión</span>}
-      </div>
-
-      <div className="listener-buttons">
-        <button className="btn-back" onClick={() => handleBack()}>
-          ← Volver
-        </button>
-        <button
-          className="btn-retry"
-          onClick={() => {
-            if (pcRef.current) {
-              try {
-                pcRef.current.close();
-              } catch { }
-              pcRef.current = null;
-            }
-            cancelAnimationFrame(animationRef.current);
-            candidateQueueRef.current = [];
-            requestOffer();
-          }}
-        >
-          Reintentar 🔄
-        </button>
-      </div>
+          <div className="listener-buttons">
+            <button className="btn-back" onClick={() => handleBack()}>
+              ← Volver
+            </button>
+            <button
+              className="btn-retry"
+              onClick={() => {
+                if (pcRef.current) {
+                  try {
+                    pcRef.current.close();
+                  } catch { }
+                  pcRef.current = null;
+                }
+                cancelAnimationFrame(animationRef.current);
+                candidateQueueRef.current = [];
+                requestOffer();
+              }}
+            >
+              Reintentar 🔄
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
