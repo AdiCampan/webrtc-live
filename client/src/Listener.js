@@ -35,10 +35,12 @@ const rtcConfig = {
 function Listener({ signalingServer, language, setRole }) {
   const pcRef = useRef(null);
   const audioRef = useRef(null);
+  const silenceAudioRef = useRef(null); // Ref para el audio de silencio
   const videoHackRef = useRef(null); // Referencia para el video dummy
   const canvasRef = useRef(null);
   const [status, setStatus] = useState("idle");
   const [isStarted, setIsStarted] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(""); // Info para debuggear en movil
   const candidateQueueRef = useRef([]);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -234,47 +236,66 @@ function Listener({ signalingServer, language, setRole }) {
   };
 
   const handleStart = async () => {
+    setDebugInfo("Iniciando...");
     try {
-      // 1. Reproducir silencio (Hack Audio Context)
-      const silence = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjYwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////8AAAAATGF2YzU2LjYwAAAAAAAAAAAAAAAAJAAAAAAAAAAAASAAAAEAAAAA";
-      const audio = new Audio(silence);
-      audio.loop = true;
-      await audio.play().catch(e => console.warn("Error play audio hack", e));
+      // 1. Reproducir silencio (Hack Audio Context - Archivo real)
+      if (!silenceAudioRef.current) {
+        silenceAudioRef.current = new Audio("/silence.mp3?v=" + Date.now());
+        silenceAudioRef.current.loop = true;
+      }
+      await silenceAudioRef.current.play().catch(e => {
+        console.warn("Error play audio hack", e);
+        setDebugInfo(prev => prev + " | Err Audio: " + e.message);
+      });
 
-      // 2. Reproducir Video Dummy (Hack Background Persistence)
-      // WebM negro mínimo 1px
+      // 2. Reproducir Video Dummy (Hack Background Persistence - Archivo real)
       if (videoHackRef.current) {
-        videoHackRef.current.volume = 0; // Asegurar silencio
-        await videoHackRef.current.play().catch(e => console.warn("Error play video hack", e));
+        videoHackRef.current.volume = 0;
+        await videoHackRef.current.play().catch(e => {
+          console.warn("Error play video hack", e);
+          setDebugInfo(prev => prev + " | Err Video: " + e.message);
+        });
       }
 
-      // 3. Configurar Media Session
+      // 3. Configurar Media Session de forma robusta
       if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: 'Traducción en Vivo',
-          artist: 'EBEN-EZER Media',
-          album: 'Culto en Vivo',
-          artwork: [
-            { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/logo512.png', sizes: '512x512', type: 'image/png' }
-          ]
-        });
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Traducción en Vivo (EBEN-EZER)',
+            artist: 'Transmisión Activa',
+            album: language === 'es' ? 'Español' : language === 'en' ? 'Inglés' : 'Rumano',
+            artwork: [
+              { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
+              { src: '/logo512.png', sizes: '512x512', type: 'image/png' }
+            ]
+          });
 
-        // Handlers dummy para mantener la sesion viva
-        navigator.mediaSession.setActionHandler('play', () => {
-          if (videoHackRef.current) videoHackRef.current.play();
-          if (audioRef.current) audioRef.current.play();
-        });
-        navigator.mediaSession.setActionHandler('pause', () => {
-          // Ignoramos pausa para evitar desconexión
-          if (videoHackRef.current) videoHackRef.current.play();
-        });
+          navigator.mediaSession.playbackState = 'playing';
+
+          navigator.mediaSession.setActionHandler('play', () => {
+            if (silenceAudioRef.current) silenceAudioRef.current.play();
+            if (videoHackRef.current) videoHackRef.current.play();
+            if (audioRef.current) audioRef.current.play();
+            navigator.mediaSession.playbackState = 'playing';
+          });
+
+          navigator.mediaSession.setActionHandler('pause', () => {
+            // No permitimos pausar realmente para no perder la conexión
+            if (silenceAudioRef.current) silenceAudioRef.current.play();
+            navigator.mediaSession.playbackState = 'playing';
+          });
+
+          setDebugInfo(prev => prev + " | MediaSession OK");
+        } catch (msErr) {
+          console.error("MediaSession Err:", msErr);
+          setDebugInfo(prev => prev + " | Err MS: " + msErr.message);
+        }
       }
 
       setIsStarted(true);
     } catch (err) {
       console.error("Error iniciando hacks:", err);
-      // Continuamos igual para no bloquear al usuario
+      setDebugInfo(prev => prev + " | Global Err: " + err.message);
       setIsStarted(true);
     }
   };
