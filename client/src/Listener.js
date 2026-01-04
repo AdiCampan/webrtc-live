@@ -240,63 +240,76 @@ function Listener({ signalingServer, language, setRole }) {
   const handleStart = async () => {
     if (isActivating) return;
     setIsActivating(true);
-    setDebugInfo("Activando...");
+    setDebugInfo("Iniciando...");
 
     try {
-      // 1. Wake Lock API: Mantener pantalla/sistema despierto
-      if ('wakeLock' in navigator) {
+      // 1. Media Session (Prioridad absoluta para que aparezca la notificación)
+      if ('mediaSession' in navigator) {
         try {
-          wakeLockRef.current = await navigator.wakeLock.request('screen');
-          setDebugInfo(prev => prev + " | WakeLock OK");
-        } catch (wlErr) {
-          console.warn("Wake Lock Error:", wlErr);
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Traducción en Vivo (EBEN-EZER)',
+            artist: 'Transmisión Activa',
+            album: language === 'es' ? 'Español' : language === 'en' ? 'Inglés' : 'Rumano',
+            artwork: [
+              { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
+              { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+            ]
+          });
+
+          navigator.mediaSession.playbackState = 'playing';
+
+          navigator.mediaSession.setActionHandler('play', () => {
+            if (silenceAudioRef.current) silenceAudioRef.current.play().catch(() => { });
+            if (audioRef.current) audioRef.current.play().catch(() => { });
+          });
+
+          navigator.mediaSession.setActionHandler('pause', () => {
+            // Ignoramos pausa
+            navigator.mediaSession.playbackState = 'playing';
+          });
+          setDebugInfo(prev => prev + " | Media OK");
+        } catch (msErr) {
+          console.error("MediaSession Err:", msErr);
+          setDebugInfo(prev => prev + " | MS Err");
         }
       }
 
-      // 2. Reproducir medios (Hack)
-      // No llamamos a .load() aquí para evitar interrupciones si ya se está cargando
-      const audioPromise = silenceAudioRef.current ? silenceAudioRef.current.play() : Promise.resolve();
-      const videoPromise = videoHackRef.current ? videoHackRef.current.play() : Promise.resolve();
-
-      await Promise.allSettled([audioPromise, videoPromise]).then(results => {
-        results.forEach((res, i) => {
-          if (res.status === 'rejected') {
-            const type = i === 0 ? "Audio" : "Video";
-            setDebugInfo(prev => prev + ` | Err ${type}: ${res.reason.message.substring(0, 20)}`);
-          }
-        });
-      });
-
-      // 3. Media Session
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: 'Traducción en Vivo (EBEN-EZER)',
-          artist: 'Transmisión Activa',
-          album: language === 'es' ? 'Español' : language === 'en' ? 'Inglés' : 'Rumano',
-          artwork: [
-            { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
-          ]
-        });
-
-        navigator.mediaSession.playbackState = 'playing';
-
-        navigator.mediaSession.setActionHandler('play', () => {
-          if (silenceAudioRef.current) silenceAudioRef.current.play().catch(() => { });
-          if (audioRef.current) audioRef.current.play().catch(() => { });
-          navigator.mediaSession.playbackState = 'playing';
-        });
-
-        navigator.mediaSession.setActionHandler('pause', () => {
-          navigator.mediaSession.playbackState = 'playing';
-        });
-        setDebugInfo(prev => prev + " | MediaSession OK");
+      // 2. Wake Lock API (Fire and Forget)
+      if ('wakeLock' in navigator) {
+        navigator.wakeLock.request('screen')
+          .then(lock => {
+            wakeLockRef.current = lock;
+            setDebugInfo(prev => prev + " | Lock OK");
+          })
+          .catch(e => console.warn("WakeLock Err:", e));
       }
 
+      // 3. Reproducir hacks (Fire and Forget - NO AWAIT)
+      // Lanzamos la reproducción pero no esperamos el resultado para no bloquear al usuario
+      if (silenceAudioRef.current) {
+        silenceAudioRef.current.play()
+          .then(() => setDebugInfo(prev => prev + " | Audio OK"))
+          .catch(e => {
+            console.warn("Audio hack promise rejected", e);
+            setDebugInfo(prev => prev + " | Audio Blocked");
+          });
+      }
+
+      if (videoHackRef.current) {
+        videoHackRef.current.play()
+          .then(() => setDebugInfo(prev => prev + " | Video OK"))
+          .catch(e => {
+            console.warn("Video hack promise rejected", e);
+            setDebugInfo(prev => prev + " | Video Blocked");
+          });
+      }
+
+      // 4. Activar interfaz inmediatamente
       setIsStarted(true);
     } catch (err) {
-      console.error("Global Error starting:", err);
-      setDebugInfo(prev => prev + " | Global Err: " + err.message);
+      console.error("Global handleStart error:", err);
+      setDebugInfo(prev => prev + " | Global Err: " + err.message.substring(0, 20));
+      // Intentamos arrancar de todos modos para que al menos intente el WebRTC
       setIsStarted(true);
     } finally {
       setIsActivating(false);
