@@ -125,8 +125,16 @@ function Broadcaster({
           console.warn("⚠️ No hay stream activo, no se puede crear Peer");
           return;
         }
-        if (peers.current[data.clientId]) {
-          peers.current[data.clientId].close();
+
+        const existingPeer = peers.current[data.clientId];
+        if (existingPeer) {
+          const state = existingPeer.iceConnectionState;
+          if (state === "connected" || state === "completed") {
+            console.log(`🟢 El cliente ${data.clientId} ya está conectado. Ignorando oferta redundante.`);
+            return;
+          }
+          // Si el estado es desconectado o fallido, limpiamos y creamos uno nuevo
+          existingPeer.close();
           delete peers.current[data.clientId];
         }
         await createPeer(data.clientId);
@@ -426,7 +434,12 @@ function Broadcaster({
     const sendBroadcastRegistration = () => {
       if (signalingServer && signalingServer.readyState === WebSocket.OPEN) {
         signalingServer.send(
-          JSON.stringify({ type: "broadcaster", language: activeLang, token })
+          JSON.stringify({ 
+            type: "broadcaster", 
+            language: activeLang, 
+            token,
+            clientId: "broadcaster-" + activeLang
+          })
         );
         console.log("✅ Broadcaster registrado en servidor");
       } else if (signalingServer) {
@@ -438,6 +451,7 @@ function Broadcaster({
                 type: "broadcaster",
                 language: activeLang,
                 token,
+                clientId: "broadcaster-" + activeLang
               })
             );
             console.log(
@@ -453,6 +467,14 @@ function Broadcaster({
         );
       }
     };
+
+    // 🔹 REFORZADO: Enviar identificación inmediata si el socket ya está abierto
+    if (signalingServer && signalingServer.readyState === WebSocket.OPEN) {
+      signalingServer.send(JSON.stringify({ 
+        type: "identify", 
+        clientId: "broadcaster-" + activeLang 
+      }));
+    }
 
     sendBroadcastRegistration();
 

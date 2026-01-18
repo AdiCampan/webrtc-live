@@ -185,6 +185,15 @@ wss.on("connection", (ws) => {
     console.log(`📩 Mensaje recibido de ${ws.id}:`, data);
 
     // ==========================
+    // Identificar Cliente (Persistencia de ID)
+    // ==========================
+    if (data.type === "identify" && data.clientId) {
+      ws.id = data.clientId;
+      console.log(`🆔 Cliente reconectado con ID persistente: ${ws.id}`);
+      return;
+    }
+
+    // ==========================
     // Registrar Broadcaster (con JWT)
     // ==========================
     if (data.type === "broadcaster" && data.language && data.token) {

@@ -55,8 +55,12 @@ function Listener({ signalingServer, language, setRole }) {
       console.warn("WebSocket no disponible para solicitar oferta");
       return;
     }
-    signalingServer.send(JSON.stringify({ type: "request-offer", language }));
-    console.log("📡 Listener solicitó oferta para idioma", language);
+    signalingServer.send(JSON.stringify({ 
+      type: "request-offer", 
+      language, 
+      clientId 
+    }));
+    console.log("📡 Listener solicitó oferta para idioma", language, "con ID", clientId);
     setStatus("requesting");
   };
 
@@ -204,6 +208,13 @@ function Listener({ signalingServer, language, setRole }) {
     if (!signalingServer || !isStarted) return;
     
     const maybeRequest = () => {
+      // 1. Identificarse ante el servidor con ID persistente
+      if (signalingServer.readyState === WebSocket.OPEN) {
+        signalingServer.send(JSON.stringify({ type: "identify", clientId }));
+        console.log("🆔 Enviada identificación persistente:", clientId);
+      }
+
+      // 2. Pedir oferta si es necesario
       // 🔹 CRÍTICO: No pedir oferta si ya estamos conectados y funcionando
       // Esto evita micro-cortes de audio cuando el WebSocket reconecta en segundo plano
       const state = pcRef.current?.iceConnectionState;
@@ -213,7 +224,11 @@ function Listener({ signalingServer, language, setRole }) {
       }
       
       if (signalingServer.readyState === WebSocket.OPEN) {
-        signalingServer.send(JSON.stringify({ type: "request-offer", language }));
+        signalingServer.send(JSON.stringify({ 
+          type: "request-offer", 
+          language, 
+          clientId 
+        }));
       }
     };
 
