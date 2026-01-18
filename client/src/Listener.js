@@ -202,21 +202,45 @@ function Listener({ signalingServer, language, setRole }) {
 
   useEffect(() => {
     if (!signalingServer || !isStarted) return;
+    
+    const maybeRequest = () => {
+      // 🔹 CRÍTICO: No pedir oferta si ya estamos conectados y funcionando
+      // Esto evita micro-cortes de audio cuando el WebSocket reconecta en segundo plano
+      const state = pcRef.current?.iceConnectionState;
+      if (state === "connected" || state === "completed") {
+        console.log("🟢 WebSocket reconectado, pero WebRTC sigue activo. Ignorando re-petición.");
+        return;
+      }
+      
+      if (signalingServer.readyState === WebSocket.OPEN) {
+        signalingServer.send(JSON.stringify({ type: "request-offer", language }));
+      }
+    };
+
     if (signalingServer.readyState === WebSocket.OPEN) {
-      signalingServer.send(JSON.stringify({ type: "request-offer", language }));
+      maybeRequest();
     } else {
-      signalingServer.addEventListener(
-        "open",
-        () => {
-          signalingServer.send(
-            JSON.stringify({ type: "request-offer", language })
-          );
-        },
-        { once: true }
-      );
+      signalingServer.addEventListener("open", maybeRequest, { once: true });
     }
+    
+    // 🔹 RESCUE LOOP: Intervalo de seguridad para segundo plano
+    const rescueInterval = setInterval(() => {
+      if (isStarted) {
+        // Asegurar que el audio de silencio siga sonando
+        if (silenceAudioRef.current && silenceAudioRef.current.paused) {
+          console.log("⚠️ Silence audio detectado en pausa, reanudando...");
+          silenceAudioRef.current.play().catch(() => {});
+        }
+        // Asegurar que el video hack siga sonando
+        if (videoHackRef.current && videoHackRef.current.paused) {
+          videoHackRef.current.play().catch(() => {});
+        }
+      }
+    }, 10000); // Cada 10 segundos
+
     return () => {
-      signalingServer.removeEventListener("open", requestOffer);
+      clearInterval(rescueInterval);
+      signalingServer.removeEventListener("open", maybeRequest);
       cancelAnimationFrame(animationRef.current);
       audioContextRef.current?.close();
       audioContextRef.current = null;
@@ -329,13 +353,25 @@ function Listener({ signalingServer, language, setRole }) {
 
       {/* 
         HACKS DE AUDIO Y VIDEO: 
-        Deben estar siempre en el DOM (pero ocultos) para que handleStart pueda activarlos 
+        Cambiamos 'display: none' por visibilidad mínima para que el navegador 
+        no considere estos elementos como 'inactivos' en segundo plano.
       */}
       <audio
         ref={silenceAudioRef}
         loop
         preload="auto"
-        style={{ display: 'none' }}
+        onEnded={() => {
+          // Si por alguna razón el loop falla, forzamos reinicio
+          silenceAudioRef.current?.play().catch(() => {});
+        }}
+        style={{ 
+          position: 'fixed', 
+          bottom: 0, 
+          opacity: 0.01, 
+          pointerEvents: 'none', 
+          width: '1px', 
+          height: '1px' 
+        }}
       >
         <source src="/silence.mp3" type="audio/mpeg" />
       </audio>
@@ -349,15 +385,15 @@ function Listener({ signalingServer, language, setRole }) {
         style={{
           position: "fixed",
           bottom: "10px",
-          right: "10px",
-          width: "10px",
-          height: "10px",
-          opacity: 0.05,
+          left: "10px",
+          width: "5px",
+          height: "5px",
+          opacity: 0.01,
           pointerEvents: "none",
           zIndex: 9999,
           background: "black"
         }}
-        onPlaying={() => setDebugInfo(prev => prev + " | Video PLAY")}
+        onPlaying={() => setDebugInfo(prev => prev.includes("Video PLAY") ? prev : prev + " | Video PLAY")}
       >
         <source src="/screenshare.webm" type="video/webm" />
       </video>
@@ -367,7 +403,14 @@ function Listener({ signalingServer, language, setRole }) {
         ref={audioRef}
         autoPlay
         playsInline
-        style={{ display: 'none' }}
+        style={{ 
+          position: 'fixed', 
+          bottom: 0, 
+          opacity: 0.01, 
+          pointerEvents: 'none', 
+          width: '1px', 
+          height: '1px' 
+        }}
       />
 
       {!isStarted ? (

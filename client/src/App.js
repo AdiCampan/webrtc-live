@@ -245,7 +245,7 @@ function App() {
           console.warn("⚠️ Error enviando ping:", e);
         }
       }
-    }, 25000);
+    }, 15000);
   };
 
   const stopKeepalive = () => {
