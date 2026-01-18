@@ -255,6 +255,18 @@ function App() {
     }
   };
 
+  const handleBackgroundTick = () => {
+    const s = wsRef.current;
+    if (s && s.readyState === WebSocket.OPEN) {
+      try {
+        s.send(JSON.stringify({ type: "ping", ts: Date.now(), source: 'audio-clock' }));
+        console.log("⏱️ Ping enviado desde el reloj de audio");
+      } catch (e) {
+        console.warn("⚠️ Error enviando ping de audio:", e);
+      }
+    }
+  };
+
   useEffect(() => {
     createWebSocket(signalingUrl);
     return () => {
@@ -388,6 +400,7 @@ function App() {
                 signalingServer={ws}
                 language={role.language}
                 setRole={setRole}
+                onBackgroundTick={handleBackgroundTick}
               />
             </div>
           )}

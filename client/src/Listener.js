@@ -32,7 +32,7 @@ const rtcConfig = {
   ].filter(Boolean),
 };
 
-function Listener({ signalingServer, language, setRole }) {
+function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
   const pcRef = useRef(null);
   const audioRef = useRef(null);
   const silenceAudioRef = useRef(null); // Ref para el audio de silencio
@@ -44,6 +44,7 @@ function Listener({ signalingServer, language, setRole }) {
   const [isActivating, setIsActivating] = useState(false); // Estado de cargando al iniciar
   const candidateQueueRef = useRef([]);
   const audioContextRef = useRef(null);
+  const scriptProcessorRef = useRef(null); // Ref para el reloj de audio
   const analyserRef = useRef(null);
   const dataArrayRef = useRef(null);
   const wakeLockRef = useRef(null); // Referencia para el Wake Lock
@@ -90,14 +91,52 @@ function Listener({ signalingServer, language, setRole }) {
     draw();
   };
 
+  const setupAudioClock = (ctx) => {
+    try {
+      if (scriptProcessorRef.current) return;
+      
+      console.log("⏱️ Iniciando reloj de audio para segundo plano...");
+      // Buffer de 4096 para balancear carga y precisión
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      let samplesCount = 0;
+      const sampleRate = ctx.sampleRate;
+      const intervalSamples = sampleRate * 8; // Tick cada 8 segundos
+
+      processor.onaudioprocess = (e) => {
+        // Necesitamos escribir algo en la salida para que el proceso no se detenga
+        const output = e.outputBuffer.getChannelData(0);
+        for (let i = 0; i < output.length; i++) {
+          output[i] = 0; // Silencio digital
+        }
+
+        samplesCount += 4096;
+        if (samplesCount >= intervalSamples) {
+          samplesCount = 0;
+          if (onBackgroundTick) onBackgroundTick();
+        }
+      };
+
+      // Conectar a la salida para mantener el flujo activo
+      processor.connect(ctx.destination);
+      scriptProcessorRef.current = processor;
+      setDebugInfo(prev => prev + " | Clock OK");
+    } catch (err) {
+      console.warn("⚠️ No se pudo iniciar reloj de audio:", err);
+    }
+  };
+
   const setupAudioVisualizer = (stream) => {
     if (!stream) return;
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext ||
-          window.webkitAudioContext)();
+          window.webkitAudioContext)({ latencyHint: 'playback' });
       }
       const audioCtx = audioContextRef.current;
+      
+      // Iniciar el reloj de audio si no está ya
+      setupAudioClock(audioCtx);
+
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 256;
@@ -269,6 +308,10 @@ function Listener({ signalingServer, language, setRole }) {
 
     return () => {
       clearInterval(rescueInterval);
+      if (scriptProcessorRef.current) {
+        try { scriptProcessorRef.current.disconnect(); } catch{}
+        scriptProcessorRef.current = null;
+      }
       signalingServer.removeEventListener("open", maybeRequest);
       cancelAnimationFrame(animationRef.current);
       audioContextRef.current?.close();
@@ -296,6 +339,15 @@ function Listener({ signalingServer, language, setRole }) {
     setDebugInfo("Iniciando...");
 
     try {
+      // 0. Asegurar AudioContext para el reloj
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      setupAudioClock(audioContextRef.current);
+
       // 1. Media Session (Prioridad absoluta para que aparezca la notificación)
       if ('mediaSession' in navigator) {
         try {
