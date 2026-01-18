@@ -230,25 +230,33 @@ function Broadcaster({
       const state = peer.iceConnectionState;
       console.log(`🔄 ICE state con ${clientId}:`, state);
 
-      if (state === "failed" || state === "disconnected") {
-        console.warn(`⚠️ ICE falló con ${clientId}, intentando restartIce`);
-        try {
-          await peer.restartIce();
-          const offer = await peer.createOffer({ iceRestart: true });
-          await peer.setLocalDescription(offer);
-          if (
-            signalingServer &&
-            signalingServer.readyState === WebSocket.OPEN
-          ) {
-            signalingServer.send(
-              JSON.stringify({ type: "offer", offer, target: clientId })
-            );
+      if (state === "disconnected") {
+        console.log(`⏳ ICE Disconnected con ${clientId}. Dando 20s para recuperación automática...`);
+        // No hacemos nada, dejamos que WebRTC intente recuperar solo
+        setTimeout(async () => {
+          const currentState = peers.current[clientId]?.iceConnectionState;
+          if (currentState === "disconnected" || currentState === "failed") {
+            console.warn(`🔄 Procediendo con restartIce para ${clientId} tras espera.`);
+            try {
+              const p = peers.current[clientId];
+              if (!p) return;
+              await p.restartIce();
+              const offer = await p.createOffer({ iceRestart: true });
+              await p.setLocalDescription(offer);
+              if (signalingServer?.readyState === WebSocket.OPEN) {
+                signalingServer.send(JSON.stringify({ type: "offer", offer, target: clientId }));
+              }
+            } catch (err) {
+              console.error("❌ restartIce falló:", err);
+            }
           }
-        } catch (err) {
-          console.error("❌ restartIce falló, recreando Peer:", err);
-          delete peers.current[clientId];
-          await createPeer(clientId);
-        }
+        }, 20000);
+      }
+
+      if (state === "failed") {
+        console.error(`❌ ICE Falló con ${clientId}. Recreando Peer.`);
+        delete peers.current[clientId];
+        await createPeer(clientId);
       }
     };
 

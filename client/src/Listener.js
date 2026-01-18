@@ -215,11 +215,25 @@ function Listener({ signalingServer, language, setRole }) {
       }
 
       // 2. Pedir oferta si es necesario
-      // 🔹 CRÍTICO: No pedir oferta si ya estamos conectados y funcionando
-      // Esto evita micro-cortes de audio cuando el WebSocket reconecta en segundo plano
       const state = pcRef.current?.iceConnectionState;
+      
+      // 🔹 CRÍTICO: No pedir oferta si ya estamos conectados y funcionando
       if (state === "connected" || state === "completed") {
         console.log("🟢 WebSocket reconectado, pero WebRTC sigue activo. Ignorando re-petición.");
+        return;
+      }
+
+      // 🔹 PACIENCIA: Si está desconectado, esperar a que el ICE intente reconectar solo
+      if (state === "disconnected") {
+        console.log("⏳ ICE Disconnected. Esperando 10s antes de forzar nueva oferta...");
+        setTimeout(() => {
+          if (pcRef.current?.iceConnectionState === "disconnected") {
+            console.log("� Sigue desconectado tras 10s. Forzando nueva oferta.");
+            if (signalingServer.readyState === WebSocket.OPEN) {
+              signalingServer.send(JSON.stringify({ type: "request-offer", language, clientId }));
+            }
+          }
+        }, 10000);
         return;
       }
       
