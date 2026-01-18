@@ -301,20 +301,11 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     console.log(`❌ Cliente desconectado: ${ws.id}`);
 
-    // 🔥 Si era un listener, avisar al broadcaster que cierre la PeerConnection
+    // � Si era un listener, actualizamos el conteo pero NO pedimos al broadcaster
+    // que cierre la conexión WebRTC. Dejamos que WebRTC intente seguir funcionando
+    // por su cuenta aunque el WebSocket se haya caído en segundo plano.
     if (!ws.isBroadcaster && ws.language) {
-      const bc = broadcasters[ws.language];
-      if (bc && bc.readyState === ws.OPEN) {
-        bc.send(
-          JSON.stringify({
-            type: "stop-connection",
-            target: ws.id,
-          })
-        );
-        console.log(
-          `🔌 Indicando al broadcaster que cierre la conexión con ${ws.id}`
-        );
-      }
+      console.log(`🔌 Listener ${ws.id} perdió WebSocket. Manteniendo WebRTC vivo...`);
     }
 
     // 🔹 Actualizar conteo
