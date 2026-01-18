@@ -49,6 +49,7 @@ function App() {
   const [reconnecting, setReconnecting] = useState(false);
   const broadcastingRef = useRef(false); // Para saber si estaba transmitiendo
   const lastBroadcastLangRef = useRef(null); // Guarda último idioma activo
+  const reconnectCheckRef = useRef(false); // Para evitar pings duplicados o reconexiones locas
 
   const [prevCount, setPrevCount] = useState(0);
   const [pop, setPop] = useState(false);
@@ -257,12 +258,37 @@ function App() {
 
   const handleBackgroundTick = () => {
     const s = wsRef.current;
+    
+    // 1. Si está conectado, mandar ping de mantenimiento
     if (s && s.readyState === WebSocket.OPEN) {
       try {
         s.send(JSON.stringify({ type: "ping", ts: Date.now(), source: 'audio-clock' }));
         console.log("⏱️ Ping enviado desde el reloj de audio");
       } catch (e) {
         console.warn("⚠️ Error enviando ping de audio:", e);
+      }
+      return;
+    }
+
+    // 2. Si NO está abierto y NO estamos ya intentando reconectar, forzar reconexión
+    // Esto es CRÍTICO para cuando el servidor reinicia y la app está en segundo plano (setTimeout muere)
+    if (!s || s.readyState === WebSocket.CLOSED || s.readyState === WebSocket.CLOSING) {
+      if (!reconnectCheckRef.current) {
+        console.log("🚨 WebSocket caído en segundo plano. Forzando reconexión inmediata vía Audio Clock...");
+        reconnectCheckRef.current = true;
+        
+        // Limpiar cualquier timeout previo de reconexión para no duplicar
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
+
+        createWebSocket(signalingUrl);
+        
+        // Desbloquear después de un margen para no saturar si hay errores constantes
+        setTimeout(() => {
+          reconnectCheckRef.current = false;
+        }, 5000);
       }
     }
   };

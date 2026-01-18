@@ -100,6 +100,7 @@ function Broadcaster({
             type: "broadcaster",
             language: selectedLanguage,
             token: token,
+            clientId: "broadcaster-" + selectedLanguage
           })
         );
         console.log("🔄 Broadcaster re-registrado (socket reconectado)");
