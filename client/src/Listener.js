@@ -104,10 +104,13 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
 
       processor.onaudioprocess = (e) => {
         const output = e.outputBuffer.getChannelData(0);
+        // MODULACIÓN DINÁMICA: El volumen oscila para que el SO no lo considere ruido estático optimizable
+        const now = Date.now();
+        const modulation = 0.5 + Math.sin(now / 1000) * 0.5; // Oscila entre 0 y 1 cada ~6 segs
+        const volume = 0.0005 + (modulation * 0.0005); // Volumen entre 0.0005 y 0.001
+
         for (let i = 0; i < output.length; i++) {
-          // 🔊 RUIDO BLANCO (0.001 vol): Mantiene el motor de audio "despierto"
-          // El silencio absoluto (0) puede hacer que el SO apague la antena de audio.
-          output[i] = (Math.random() * 2 - 1) * 0.001; 
+          output[i] = (Math.random() * 2 - 1) * volume; 
         }
 
         samplesCount += 4096;
@@ -115,12 +118,12 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
           samplesCount = 0;
           if (onBackgroundTick) onBackgroundTick();
           
-          // 🔄 ROTAR METADATOS: Engaña al SO para que crea que hay actividad de usuario
+          // 🔄 METADATOS VIVOS: Información cambiante para mantener prioridad
           if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = new window.MediaMetadata({
-              title: `Live ${language.toUpperCase()} • ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+              title: `Live ${language.toUpperCase()} • Señal Activa`,
               artist: "Iglesia Eben-Ezer",
-              album: "Traducción en Vivo",
+              album: `Actualizado: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}`,
               artwork: [
                 { src: "/logo192.png", sizes: "192x192", type: "image/png" },
               ],

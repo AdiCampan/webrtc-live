@@ -49,7 +49,7 @@ function App() {
   const [reconnecting, setReconnecting] = useState(false);
   const broadcastingRef = useRef(false); // Para saber si estaba transmitiendo
   const lastBroadcastLangRef = useRef(null); // Guarda último idioma activo
-  const reconnectCheckRef = useRef(false); // Para evitar pings duplicados o reconexiones locas
+  const lastReconnectAttemptRef = useRef(0); // Timestamp del último intento (no depende de timers)
 
   const [prevCount, setPrevCount] = useState(0);
   const [pop, setPop] = useState(false);
@@ -271,11 +271,13 @@ function App() {
     }
 
     // 2. Si NO está abierto y NO estamos ya intentando reconectar, forzar reconexión
-    // Esto es CRÍTICO para cuando el servidor reinicia y la app está en segundo plano (setTimeout muere)
+    // Esto es CRÍTICO: Usamos timestamps para el bloqueo porque Date.now() no se congela en segundo plano.
     if (!s || s.readyState === WebSocket.CLOSED || s.readyState === WebSocket.CLOSING) {
-      if (!reconnectCheckRef.current) {
+      const now = Date.now();
+      // Solo intentar reconexión si han pasado al menos 10 segundos desde el último intento
+      if (now - lastReconnectAttemptRef.current > 10000) {
         console.log("🚨 WebSocket caído en segundo plano. Forzando reconexión inmediata vía Audio Clock...");
-        reconnectCheckRef.current = true;
+        lastReconnectAttemptRef.current = now;
         
         // Limpiar cualquier timeout previo de reconexión para no duplicar
         if (reconnectTimeoutRef.current) {
@@ -284,11 +286,6 @@ function App() {
         }
 
         createWebSocket(signalingUrl);
-        
-        // Desbloquear después de un margen para no saturar si hay errores constantes
-        setTimeout(() => {
-          reconnectCheckRef.current = false;
-        }, 5000);
       }
     }
   };
