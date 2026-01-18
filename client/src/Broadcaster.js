@@ -232,12 +232,12 @@ function Broadcaster({
       console.log(`🔄 ICE state con ${clientId}:`, state);
 
       if (state === "disconnected") {
-        console.log(`⏳ ICE Disconnected con ${clientId}. Dando 20s para recuperación automática...`);
+        console.log(`⏳ ICE Disconnected con ${clientId}. Dando 120s para recuperación automática...`);
         // No hacemos nada, dejamos que WebRTC intente recuperar solo
         setTimeout(async () => {
           const currentState = peers.current[clientId]?.iceConnectionState;
           if (currentState === "disconnected" || currentState === "failed") {
-            console.warn(`🔄 Procediendo con restartIce para ${clientId} tras espera.`);
+            console.warn(`🔄 Procediendo con restartIce para ${clientId} tras espera de 120s.`);
             try {
               const p = peers.current[clientId];
               if (!p) return;
@@ -251,7 +251,7 @@ function Broadcaster({
               console.error("❌ restartIce falló:", err);
             }
           }
-        }, 20000);
+        }, 120000);
       }
 
       if (state === "failed") {

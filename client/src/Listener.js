@@ -103,16 +103,29 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       const intervalSamples = sampleRate * 8; // Tick cada 8 segundos
 
       processor.onaudioprocess = (e) => {
-        // Necesitamos escribir algo en la salida para que el proceso no se detenga
         const output = e.outputBuffer.getChannelData(0);
         for (let i = 0; i < output.length; i++) {
-          output[i] = 0; // Silencio digital
+          // 🔊 RUIDO BLANCO (0.001 vol): Mantiene el motor de audio "despierto"
+          // El silencio absoluto (0) puede hacer que el SO apague la antena de audio.
+          output[i] = (Math.random() * 2 - 1) * 0.001; 
         }
 
         samplesCount += 4096;
         if (samplesCount >= intervalSamples) {
           samplesCount = 0;
           if (onBackgroundTick) onBackgroundTick();
+          
+          // 🔄 ROTAR METADATOS: Engaña al SO para que crea que hay actividad de usuario
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new window.MediaMetadata({
+              title: `Live ${language.toUpperCase()} • ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+              artist: "Iglesia Eben-Ezer",
+              album: "Traducción en Vivo",
+              artwork: [
+                { src: "/logo192.png", sizes: "192x192", type: "image/png" },
+              ],
+            });
+          }
         }
       };
 

@@ -143,6 +143,43 @@ const broadcasters = {}; // { es: ws, en: ws, ro: ws }
 // 🔹 Estado global de transmisiones activas
 const activeBroadcasts = { es: false, en: false, ro: false };
 
+// 🔹 Buffer de mensajes para clientes desconectados temporalmente (60s vida útil)
+const messageQueue = {}; // { clientId: [{msg, expiry}, ...] }
+
+function pushToQueue(clientId, message) {
+  if (!messageQueue[clientId]) messageQueue[clientId] = [];
+  messageQueue[clientId].push({
+    message,
+    expiry: Date.now() + 60000 // Expira en 60 segundos
+  });
+  // Limitar tamaño del buffer por seguridad
+  if (messageQueue[clientId].length > 50) messageQueue[clientId].shift();
+  console.log(`📥 Mensaje guardado en buffer para ${clientId} (Total: ${messageQueue[clientId].length})`);
+}
+
+function flushQueue(ws) {
+  const queue = messageQueue[ws.id];
+  if (!queue || queue.length === 0) return;
+
+  console.log(`📤 Entregando ${queue.length} mensajes pendientes a ${ws.id}`);
+  const now = Date.now();
+  queue.forEach(item => {
+    if (item.expiry > now && ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify(item.message));
+    }
+  });
+  delete messageQueue[ws.id];
+}
+
+// Limpieza periódica del buffer global cada minuto
+setInterval(() => {
+  const now = Date.now();
+  Object.keys(messageQueue).forEach(id => {
+    messageQueue[id] = messageQueue[id].filter(item => item.expiry > now);
+    if (messageQueue[id].length === 0) delete messageQueue[id];
+  });
+}, 60000);
+
 // 🔹 Función para enviar un mensaje a todos los clientes conectados
 function broadcastToAll(message) {
   const payload = JSON.stringify(message);
@@ -190,6 +227,7 @@ wss.on("connection", (ws) => {
     if (data.type === "identify" && data.clientId) {
       ws.id = data.clientId;
       console.log(`🆔 Cliente reconectado con ID persistente: ${ws.id}`);
+      flushQueue(ws); // Entregar mensajes que llegaron mientras estaba offline
       return;
     }
 
@@ -284,8 +322,11 @@ wss.on("connection", (ws) => {
     // ==========================
     if (["offer", "answer", "candidate"].includes(data.type)) {
       const targetClient = [...wss.clients].find((c) => c.id === data.target);
+      
       if (!targetClient || targetClient.readyState !== ws.OPEN) {
-        console.warn(`⚠️ Target no disponible para ${data.type}`);
+        // 🔴 MEJORA: En lugar de dar error, guardar en el buffer
+        console.warn(`⚠️ Target ${data.target} no disponible para ${data.type}. Guardando en buffer...`);
+        pushToQueue(data.target, { ...data, clientId: ws.id });
         return;
       }
 
