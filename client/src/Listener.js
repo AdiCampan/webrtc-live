@@ -37,6 +37,7 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
   const audioRef = useRef(null);
   const silenceAudioRef = useRef(null); // Ref para el audio de silencio
   const videoHackRef = useRef(null); // Referencia para el video dummy
+  const canvasHackRef = useRef(null); // Canvas para el truco del píxel móvil
   const canvasRef = useRef(null);
   const [status, setStatus] = useState("idle");
   const [isStarted, setIsStarted] = useState(false);
@@ -138,6 +139,36 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       setDebugInfo(prev => prev + " | Clock OK");
     } catch (err) {
       console.warn("⚠️ No se pudo iniciar reloj de audio:", err);
+    }
+  };
+  
+  // 🎨 TRUCO DEL PÍXEL MÓVIL (Active Pixel Trick)
+  // Genera un stream de video de 1x1 que cambia constantemente
+  // Esto engaña al SO para que crea que hay decodificación de video activa
+  const setupCanvasHack = () => {
+    if (!canvasHackRef.current || !videoHackRef.current) return;
+    
+    console.log("🎨 Iniciando truco del píxel móvil...");
+    const canvas = canvasHackRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    // Función que cambia el color de un píxel
+    const animatePixel = () => {
+      if (!isStarted) return;
+      ctx.fillStyle = `rgb(${Math.random()*255},${Math.random()*255},${Math.random()*255})`;
+      ctx.fillRect(0, 0, 1, 1);
+      setTimeout(animatePixel, 100); // 10 fps es suficiente
+    };
+    
+    animatePixel();
+    
+    // Capturar el stream del canvas y ponerlo en el video hack
+    try {
+      const stream = canvas.captureStream(10); // 10 fps
+      videoHackRef.current.srcObject = stream;
+      videoHackRef.current.play().catch(e => console.warn("Video hack stream failed:", e));
+    } catch (e) {
+      console.warn("CaptureStream not supported or failed:", e);
     }
   };
 
@@ -299,6 +330,10 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
         if (videoHackRef.current && videoHackRef.current.paused) {
           videoHackRef.current.play().catch(() => {});
         }
+        // Refuerzo de MediaSession para evitar que el SO "olvide" que estamos reproduciendo
+        if ('mediaSession' in navigator && navigator.mediaSession.playbackState !== 'playing') {
+          navigator.mediaSession.playbackState = 'playing';
+        }
       }
     }, 10000); // Cada 10 segundos
 
@@ -397,11 +432,16 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       }
 
       if (videoHackRef.current) {
+        // Primero intentamos con el archivo screenshare.webm
         videoHackRef.current.play()
-          .then(() => setDebugInfo(prev => prev + " | Video OK"))
+          .then(() => {
+            setDebugInfo(prev => prev + " | Video OK");
+            // Si funciona el video estático, reforzamos con el canvas hack
+            setupCanvasHack();
+          })
           .catch(e => {
-            console.warn("Video hack promise rejected", e);
-            setDebugInfo(prev => prev + " | Video Blocked");
+            console.warn("Video hack file rejected, trying canvas only", e);
+            setupCanvasHack();
           });
       }
 
@@ -463,9 +503,9 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
           position: "fixed",
           bottom: "10px",
           left: "10px",
-          width: "5px",
-          height: "5px",
-          opacity: 0.01,
+          width: "10px",
+          height: "10px",
+          opacity: 0.05, // Un poco más visible para que Safari no lo descarte
           pointerEvents: "none",
           zIndex: 9999,
           background: "black"
@@ -474,6 +514,14 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       >
         <source src="/screenshare.webm" type="video/webm" />
       </video>
+
+      {/* Canvas oculto para el truco del píxel */}
+      <canvas 
+        ref={canvasHackRef} 
+        width="1" 
+        height="1" 
+        style={{ position: 'fixed', left: '-100px', pointerEvents: 'none' }}
+      />
 
       {/* Audio de WebRTC real */}
       <audio

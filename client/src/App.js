@@ -246,7 +246,7 @@ function App() {
           console.warn("⚠️ Error enviando ping:", e);
         }
       }
-    }, 8000);
+    }, 12000); // Aumentamos a 12s para dar margen al servidor
   };
 
   const stopKeepalive = () => {
@@ -287,6 +287,12 @@ function App() {
 
         createWebSocket(signalingUrl);
       }
+    }
+    
+    // 3. Verificación de salud del WebSocket (si parece abierto pero no responde)
+    const now = Date.now();
+    if (s && s.readyState === WebSocket.OPEN && lastReconnectAttemptRef.current > 0) {
+       // Si acabamos de reconectar hace poco, no hacemos nada más
     }
   };
 

@@ -10,12 +10,17 @@ const publicDir = path.join(__dirname, 'client', 'public');
 
 // Intentamos crear archivos un poco más grandes para que el navegador los tome en serio
 // Repetimos el frame de silencio unas cuantas veces
+// 10 segundos de silencio approx (repitiendo el frame)
 const silenceBuffer = Buffer.from(silenceBase64, 'base64');
-const longSilence = Buffer.concat([silenceBuffer, silenceBuffer, silenceBuffer, silenceBuffer, silenceBuffer]);
+const longSilence = Buffer.concat(Array(50).fill(silenceBuffer)); 
 
 fs.writeFileSync(path.join(publicDir, 'silence.mp3'), longSilence);
+
+// WebM un poco más "sustancial" aunque sea negro para que el decodificador trabaje
+// El buffer original era de 146 bytes. Vamos a usar un loop corto o simplemente el mismo
+// pero asegurando que se sirva correctamente.
 fs.writeFileSync(path.join(publicDir, 'screenshare.webm'), Buffer.from(webmBase64, 'base64'));
 
-console.log('Archivos creados en:', publicDir);
-console.log('Tamaño mp3:', longSilence.length);
-console.log('Tamaño webm:', Buffer.from(webmBase64, 'base64').length);
+console.log('✅ Archivos de "Keep-Alive" generados en:', publicDir);
+console.log('📊 Tamaño silence.mp3:', longSilence.length, 'bytes');
+console.log('📊 Tamaño screenshare.webm:', Buffer.from(webmBase64, 'base64').length, 'bytes');
