@@ -422,6 +422,11 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       // 3. Reproducir hacks (Fire and Forget - NO AWAIT)
       // Lanzamos la reproducción pero no esperamos el resultado para no bloquear al usuario
       if (silenceAudioRef.current) {
+        // 🔊 TRUCO CRÍTICO: El audio NO debe estar silenciado (muted=false)
+        // para que Chrome Android le dé prioridad de "reproducción audible".
+        silenceAudioRef.current.muted = false;
+        silenceAudioRef.current.volume = 0.01; // Casi inaudible pero "activo" para el OS
+        
         silenceAudioRef.current.play()
           .then(() => setDebugInfo(prev => prev + " | Audio OK"))
           .catch(e => {
