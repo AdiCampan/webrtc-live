@@ -45,7 +45,7 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
   const [isActivating, setIsActivating] = useState(false); // Estado de cargando al iniciar
   const candidateQueueRef = useRef([]);
   const audioContextRef = useRef(null);
-  const scriptProcessorRef = useRef(null); // Ref para el reloj de audio
+  const audioWorkletNodeRef = useRef(null); // Ref para el nodo de AudioWorklet
   const analyserRef = useRef(null);
   const dataArrayRef = useRef(null);
   const wakeLockRef = useRef(null); // Referencia para el Wake Lock
@@ -92,31 +92,20 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
     draw();
   };
 
-  const setupAudioClock = (ctx) => {
+  const setupAudioClock = async (ctx) => {
     try {
-      if (scriptProcessorRef.current) return;
+      if (audioWorkletNodeRef.current) return;
       
-      console.log("⏱️ Iniciando reloj de audio para segundo plano...");
-      // Buffer de 4096 para balancear carga y precisión
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
-      let samplesCount = 0;
-      const sampleRate = ctx.sampleRate;
-      const intervalSamples = sampleRate * 8; // Tick cada 8 segundos
-
-      processor.onaudioprocess = (e) => {
-        const output = e.outputBuffer.getChannelData(0);
-        // MODULACIÓN DINÁMICA: El volumen oscila para que el SO no lo considere ruido estático optimizable
-        const now = Date.now();
-        const modulation = 0.5 + Math.sin(now / 1000) * 0.5; // Oscila entre 0 y 1 cada ~6 segs
-        const volume = 0.0005 + (modulation * 0.0005); // Volumen entre 0.0005 y 0.001
-
-        for (let i = 0; i < output.length; i++) {
-          output[i] = (Math.random() * 2 - 1) * volume; 
-        }
-
-        samplesCount += 4096;
-        if (samplesCount >= intervalSamples) {
-          samplesCount = 0;
+      console.log("⏱️ Iniciando reloj de audio via AudioWorklet...");
+      
+      // Cargar el módulo del worklet (archivo estático en /public)
+      await ctx.audioWorklet.addModule('/audio-clock-processor.js');
+      
+      const workletNode = new AudioWorkletNode(ctx, 'audio-clock-processor');
+      
+      // Escuchar ticks desde el worklet
+      workletNode.port.onmessage = (event) => {
+        if (event.data.type === 'tick') {
           if (onBackgroundTick) onBackgroundTick();
           
           // 🔄 METADATOS VIVOS: Información cambiante para mantener prioridad
@@ -133,12 +122,22 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
         }
       };
 
-      // Conectar a la salida para mantener el flujo activo
-      processor.connect(ctx.destination);
-      scriptProcessorRef.current = processor;
-      setDebugInfo(prev => prev + " | Clock OK");
+      // Conectar a la salida para mantener el flujo activo (silencioso)
+      workletNode.connect(ctx.destination);
+      audioWorkletNodeRef.current = workletNode;
+      setDebugInfo(prev => prev + " | Worklet OK");
+      
+      // 🛡️ AUTO-RESUME: Si el sistema suspende el contexto, intentamos despertarlo
+      ctx.onstatechange = () => {
+        console.log("🔊 AudioContext state change:", ctx.state);
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(() => console.log("✅ AudioContext reanudado tras suspensión externa"));
+        }
+      };
+      
     } catch (err) {
-      console.warn("⚠️ No se pudo iniciar reloj de audio:", err);
+      console.warn("⚠️ No se pudo iniciar AudioWorklet:", err);
+      setDebugInfo(prev => prev + " | Worklet Err");
     }
   };
   
@@ -339,9 +338,9 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
 
     return () => {
       clearInterval(rescueInterval);
-      if (scriptProcessorRef.current) {
-        try { scriptProcessorRef.current.disconnect(); } catch{}
-        scriptProcessorRef.current = null;
+      if (audioWorkletNodeRef.current) {
+        try { audioWorkletNodeRef.current.disconnect(); } catch{}
+        audioWorkletNodeRef.current = null;
       }
       signalingServer.removeEventListener("open", maybeRequest);
       cancelAnimationFrame(animationRef.current);
