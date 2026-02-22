@@ -325,16 +325,16 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
           console.log("⚠️ Silence audio detectado en pausa, reanudando...");
           silenceAudioRef.current.play().catch(() => {});
         }
-        // Asegurar que el video hack siga sonando
+        // Asegurar que el video hack siga sonando (truco Round 4: mantener video despierto)
         if (videoHackRef.current && videoHackRef.current.paused) {
           videoHackRef.current.play().catch(() => {});
         }
-        // Refuerzo de MediaSession para evitar que el SO "olvide" que estamos reproduciendo
-        if ('mediaSession' in navigator && navigator.mediaSession.playbackState !== 'playing') {
+        // 💓 HEARTBEAT AGRESIVO (Round 4): Cada segundo refrescamos MediaSession
+        if ('mediaSession' in navigator) {
           navigator.mediaSession.playbackState = 'playing';
         }
       }
-    }, 10000); // Cada 10 segundos
+    }, 1000); // Antes 10000ms, ahora 1000ms para máxima persistencia
 
     return () => {
       clearInterval(rescueInterval);
@@ -422,10 +422,12 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       // 3. Reproducir hacks (Fire and Forget - NO AWAIT)
       // Lanzamos la reproducción pero no esperamos el resultado para no bloquear al usuario
       if (silenceAudioRef.current) {
-        // 🔊 TRUCO CRÍTICO: El audio NO debe estar silenciado (muted=false)
-        // para que Chrome Android le dé prioridad de "reproducción audible".
+        // 🔊 TRUCO MAESTRO (Round 4): El audio NO debe estar silenciado (muted=false)
+        // y lo ponemos a VOLUMEN MÁXIMO (1.0). Como el archivo silence.mp3 es 
+        // silencio digital puro, no se oirá nada, pero el SO Android creerá
+        // que es una sesión multimedia de alta prioridad.
         silenceAudioRef.current.muted = false;
-        silenceAudioRef.current.volume = 0.01; // Casi inaudible pero "activo" para el OS
+        silenceAudioRef.current.volume = 1.0; 
         
         silenceAudioRef.current.play()
           .then(() => setDebugInfo(prev => prev + " | Audio OK"))
@@ -527,8 +529,9 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
         style={{ position: 'fixed', left: '-100px', pointerEvents: 'none' }}
       />
 
-      {/* Audio de WebRTC real */}
-      <audio
+      {/* 📹 TRUCO CRÍTICO (Round 4): Usamos <video> en lugar de <audio> para el stream remoto. 
+          Android prioriza mucho más el proceso si cree que es una reproducción de video activa. */}
+      <video
         ref={audioRef}
         autoPlay
         playsInline
