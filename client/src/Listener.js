@@ -228,10 +228,47 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
           const stream = ev.streams[0];
           if (audioRef.current) {
             audioRef.current.srcObject = stream;
+            audioRef.current.muted = false; // 🔊 Explícitamente NO muted
+            audioRef.current.volume = 1.0;
             audioRef.current.play().catch(() => { });
           }
           setupAudioVisualizer(stream);
           setStatus("connected");
+
+          // 🔑 CLAVE: Registrar MediaSession AQUÍ, cuando el stream real llega.
+          // Chrome Android sólo crea la notificación de pantalla de bloqueo cuando
+          // detecta que un <video>/<audio> REAL está reproduciendo. Si lo registramos
+          // antes, Chrome lo ignora porque no hay stream todavía.
+          if ('mediaSession' in navigator) {
+            try {
+              navigator.mediaSession.metadata = new MediaMetadata({
+                title: 'Traducción en Vivo',
+                artist: 'Iglesia Eben-Ezer',
+                album: language === 'es' ? '🇪🇸 Español' : language === 'en' ? '🇬🇧 English' : '🇷🇴 Română',
+                artwork: [
+                  { src: '/logo192.png', sizes: '192x192', type: 'image/png' },
+                  { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+                ]
+              });
+              navigator.mediaSession.playbackState = 'playing';
+              // Handlers obligatorios para que aparezca la notificación con botones
+              navigator.mediaSession.setActionHandler('play', () => {
+                audioRef.current?.play().catch(() => {});
+                silenceAudioRef.current?.play().catch(() => {});
+                navigator.mediaSession.playbackState = 'playing';
+              });
+              navigator.mediaSession.setActionHandler('pause', () => {
+                // Ignorar pausa — nunca queremos que se pause
+                navigator.mediaSession.playbackState = 'playing';
+              });
+              navigator.mediaSession.setActionHandler('stop', null);
+              navigator.mediaSession.setActionHandler('seekbackward', null);
+              navigator.mediaSession.setActionHandler('seekforward', null);
+              setDebugInfo(prev => prev + ' | MS-LIVE');
+            } catch(e) {
+              console.warn('MediaSession ontrack error:', e);
+            }
+          }
         };
 
         pc.onicecandidate = (ev) => {
@@ -529,19 +566,23 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
         style={{ position: 'fixed', left: '-100px', pointerEvents: 'none' }}
       />
 
-      {/* 📹 TRUCO CRÍTICO (Round 4): Usamos <video> en lugar de <audio> para el stream remoto. 
-          Android prioriza mucho más el proceso si cree que es una reproducción de video activa. */}
+      {/* 📹 TRUCO CRÍTICO (Round 4): <video> para el stream de audio WebRTC.
+          Debe ser ligeramente visible (no display:none, no opacity:0) para que
+          Chrome Android lo adopte como sesión multimedia y muestre la notificación
+          de pantalla de bloqueo — sin esto, Android mata el audio en segundo plano. */}
       <video
         ref={audioRef}
         autoPlay
         playsInline
         style={{ 
           position: 'fixed', 
-          bottom: 0, 
-          opacity: 0.01, 
+          bottom: '2px', 
+          right: '2px',
+          opacity: 0.05,
           pointerEvents: 'none', 
-          width: '1px', 
-          height: '1px' 
+          width: '2px', 
+          height: '2px',
+          zIndex: 9998
         }}
       />
 
