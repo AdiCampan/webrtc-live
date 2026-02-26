@@ -1,41 +1,49 @@
 // audio-clock-processor.js
+// 
+// 🎯 OBJETIVO CRÍTICO: Generar un tono CONTINUO de 20Hz.
+// 
+// ¿Por qué 20Hz? Es el límite inferior de la audición humana (prácticamente inaudible)
+// pero Chrome SÍ lo detecta como "señal de audio real" y activa la Media Session
+// notification en la pantalla de bloqueo de Android. Sin esto, Chrome clasifica
+// el silencio como "sin media" y Android mata el proceso a los ~2 minutos.
+//
 class AudioClockProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.lastTick = 0;
-    this.sampleRate = 48000; // Valor inicial, se actualizará si es necesario
-    this.tickIntervalSamples = this.sampleRate * 8; // Tick cada 8 segundos por defecto
     this.samplesCount = 0;
+    this.tickIntervalSamples = 48000 * 8; // Tick cada ~8 segundos
+    
+    // Generador de onda sinusoidal a 20Hz
+    // Frecuencia elegida: 18Hz (por debajo del umbral de audición humana ~20Hz)
+    // pero absolutamente detectable por el hardware y Chrome
+    this.frequency = 18; // Hz
+    this.phase = 0;      // Fase actual de la onda
+    this.amplitude = 0.003; // 0.3% de volumen — inaudible pero no "silencio"
   }
 
   process(inputs, outputs, parameters) {
     const output = outputs[0];
     const channel = output[0];
 
-    // Mantener el hilo de audio ocupado/activo con ruido inaudible si es necesario
-    // Pero principalmente queremos contar muestras para el tick de tiempo real
     if (channel) {
-      this.samplesCount += channel.length;
-      
-      const now = Date.now();
-      // Enviar tick cada ~8 segundos para el WebSocket/UI
-      if (this.samplesCount >= this.tickIntervalSamples) {
-        this.samplesCount = 0;
-        this.port.postMessage({ type: 'tick', timestamp: now });
+      const sr = sampleRate; // 'sampleRate' es global en AudioWorklet context
+      const phaseIncrement = (2 * Math.PI * this.frequency) / sr;
+
+      // Generar onda sinusoidal de 18Hz
+      for (let i = 0; i < channel.length; i++) {
+        channel[i] = Math.sin(this.phase) * this.amplitude;
+        this.phase += phaseIncrement;
+        // Evitar desbordamiento de la fase
+        if (this.phase > 2 * Math.PI) {
+          this.phase -= 2 * Math.PI;
+        }
       }
 
-      // 💓 PULSO DE HARDWARE: Cada 5 segundos generamos un micro-pulso inaudible
-      // pero que obliga al hardware a procesar una señal no-cero.
-      if (Math.round(now / 1000) % 5 === 0 && (now % 1000) < 20) {
-        // Un pulso de 20ms de ruido a volumen muy bajo
-        for (let i = 0; i < channel.length; i++) {
-          channel[i] = (Math.random() * 2 - 1) * 0.005; // 0.5% de volumen
-        }
-      } else {
-        // Ruido de fondo casi nulo pero constante
-        for (let i = 0; i < channel.length; i++) {
-          channel[i] = (Math.random() * 2 - 1) * 0.0001;
-        }
+      // Contar muestras para el tick de tiempo
+      this.samplesCount += channel.length;
+      if (this.samplesCount >= this.tickIntervalSamples) {
+        this.samplesCount = 0;
+        this.port.postMessage({ type: 'tick', timestamp: Date.now() });
       }
     }
 
