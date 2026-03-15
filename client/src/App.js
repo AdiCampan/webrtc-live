@@ -385,12 +385,14 @@ function App() {
             <br />
             <div className="app-download-prompt">
               Para una mejor experiencia, instala y escucha desde la aplicación:
-              <div className="app-download-icons" style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '10px' }}>
-                <a href="https://apps.apple.com/app/traducci%C3%B3n-en-vivo/id6759227856" target="_blank" rel="noopener noreferrer" title="Descargar para Apple" style={{ color: 'inherit', fontSize: '28px', transition: 'transform 0.2s' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-                  <FaApple />
+              <div className="app-download-icons" style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '15px' }}>
+                <a href="https://apps.apple.com/app/traducci%C3%B3n-en-vivo/id6759227856" target="_blank" rel="noopener noreferrer" className="app-download-btn btn-apple" title="Descargar para Apple">
+                  <FaApple size={22} />
+                  App Store
                 </a>
-                <a href="#" target="_blank" rel="noopener noreferrer" title="Descargar para Android" style={{ color: '#3DDC84', fontSize: '28px', transition: 'transform 0.2s' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-                  <FaAndroid />
+                <a href="#" target="_blank" rel="noopener noreferrer" className="app-download-btn btn-android" title="Descargar para Android">
+                  <FaAndroid size={22} />
+                  Play Store
                 </a>
               </div>
             </div>
