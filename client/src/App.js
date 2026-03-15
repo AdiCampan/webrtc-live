@@ -18,7 +18,7 @@ import {
   Youtube,
   MessageCircle,
 } from "lucide-react";
-import { FaWhatsapp } from "react-icons/fa";
+import { FaWhatsapp, FaApple, FaAndroid } from "react-icons/fa";
 
 function App() {
   // WebSocket
@@ -381,6 +381,19 @@ function App() {
             </ul>
             Si necesitas auriculares o adaptadores, contacta con el equipo de
             sonido. ¡Gracias por acompañarnos!
+            <br />
+            <br />
+            <div className="app-download-prompt">
+              Para una mejor experiencia, instala y escucha desde la aplicación:
+              <div className="app-download-icons" style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '10px' }}>
+                <a href="https://apps.apple.com/app/traducci%C3%B3n-en-vivo/id6759227856" target="_blank" rel="noopener noreferrer" title="Descargar para Apple" style={{ color: 'inherit', fontSize: '28px', transition: 'transform 0.2s' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+                  <FaApple />
+                </a>
+                <a href="#" target="_blank" rel="noopener noreferrer" title="Descargar para Android" style={{ color: '#3DDC84', fontSize: '28px', transition: 'transform 0.2s' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+                  <FaAndroid />
+                </a>
+              </div>
+            </div>
           </div>
 
           {/* Botones de escuchar solo si no se ha seleccionado rol */}
