@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix server\" \"npm start --prefix client\"",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently \"npm run start --prefix server\" \"npm start --prefix client\"",
     "start": "npm start --prefix server",
     "build": "npm install --prefix client && npm run build --prefix client"
   },

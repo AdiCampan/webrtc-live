@@ -136,6 +136,7 @@ const server = app.listen(PORT, () => {
 });
 
 const wss = new WebSocketServer({ server });
+const WS_OPEN = 1;
 
 // Mapa de Broadcasters por idioma
 const broadcasters = {}; // { es: ws, en: ws, ro: ws }
@@ -164,7 +165,7 @@ function flushQueue(ws) {
   console.log(`📤 Entregando ${queue.length} mensajes pendientes a ${ws.id}`);
   const now = Date.now();
   queue.forEach(item => {
-    if (item.expiry > now && ws.readyState === ws.OPEN) {
+    if (item.expiry > now && ws.readyState === WS_OPEN) {
       ws.send(JSON.stringify(item.message));
     }
   });
@@ -184,7 +185,7 @@ setInterval(() => {
 function broadcastToAll(message) {
   const payload = JSON.stringify(message);
   wss.clients.forEach((client) => {
-    if (client.readyState === client.OPEN) client.send(payload);
+    if (client.readyState === WS_OPEN) client.send(payload);
   });
 }
 
@@ -228,6 +229,11 @@ wss.on("connection", (ws) => {
       ws.id = data.clientId;
       console.log(`🆔 Cliente reconectado con ID persistente: ${ws.id}`);
       flushQueue(ws); // Entregar mensajes que llegaron mientras estaba offline
+      return;
+    }
+
+    // Heartbeat from clients (keeps Render free tier awake)
+    if (data.type === "ping") {
       return;
     }
 
@@ -275,7 +281,7 @@ wss.on("connection", (ws) => {
       updateListenerCounts();
 
       const targetBroadcaster = broadcasters[data.language];
-      if (targetBroadcaster && targetBroadcaster.readyState === ws.OPEN) {
+      if (targetBroadcaster && targetBroadcaster.readyState === WS_OPEN) {
         targetBroadcaster.send(
           JSON.stringify({
             type: "request-offer",
@@ -305,7 +311,7 @@ wss.on("connection", (ws) => {
 
         // 🔥 AVISAR AL BROADCASTER QUE CORTE EL peerConnection
         const bc = broadcasters[data.language];
-        if (bc && bc.readyState === ws.OPEN) {
+        if (bc && bc.readyState === WS_OPEN) {
           bc.send(
             JSON.stringify({
               type: "stop-connection",
@@ -323,7 +329,7 @@ wss.on("connection", (ws) => {
     if (["offer", "answer", "candidate"].includes(data.type)) {
       const targetClient = [...wss.clients].find((c) => c.id === data.target);
       
-      if (!targetClient || targetClient.readyState !== ws.OPEN) {
+      if (!targetClient || targetClient.readyState !== WS_OPEN) {
         // 🔴 MEJORA: En lugar de dar error, guardar en el buffer
         console.warn(`⚠️ Target ${data.target} no disponible para ${data.type}. Guardando en buffer...`);
         pushToQueue(data.target, { ...data, clientId: ws.id });
