@@ -1,8 +1,8 @@
 import express from "express";
 import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
-import path from "path";
-import { fileURLToPath } from "url";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -98,7 +98,7 @@ app.get("/next-event", async (req, res) => {
 app.post("/next-event", async (req, res) => {
   const { date, token } = req.body;
   const decoded = verifyToken(token);
-  if (!decoded || decoded.role !== "broadcaster") {
+  if (decoded?.role !== "broadcaster") {
     return res.status(403).json({ error: "No autorizado" });
   }
 
@@ -137,6 +137,44 @@ const server = app.listen(PORT, () => {
 
 const wss = new WebSocketServer({ server });
 const WS_OPEN = 1;
+
+/**
+ * Force-quit (e.g. iOS app switcher) often drops TCP without firing WS "close" promptly.
+ * Track last client activity; terminate stale signaling sockets so listener counts recover.
+ * Idle browsers (no language yet) are not subject to the short stale window.
+ */
+const WS_STALE_CHECK_MS = 15000;
+const WS_STALE_AFTER_MS = 55000;
+
+function touchClientActivity(ws) {
+  ws.lastClientActivityAt = Date.now();
+}
+
+function shouldEnforceStaleDisconnect(ws) {
+  return Boolean(ws.isBroadcaster || ws.language);
+}
+
+const heartbeatInterval = setInterval(() => {
+  const now = Date.now();
+  wss.clients.forEach((client) => {
+    if (client.readyState !== WS_OPEN) return;
+    if (shouldEnforceStaleDisconnect(client)) {
+      const last = client.lastClientActivityAt ?? 0;
+      if (now - last > WS_STALE_AFTER_MS) {
+        console.warn(`💀 Terminating stale WebSocket: ${client.id}`);
+        client.terminate();
+        return;
+      }
+    }
+    try {
+      client.ping();
+    } catch (err) {
+      console.warn("⚠️ WebSocket ping failed:", err);
+    }
+  });
+}, WS_STALE_CHECK_MS);
+
+server.on("close", () => clearInterval(heartbeatInterval));
 
 // Mapa de Broadcasters por idioma
 const broadcasters = {}; // { es: ws, en: ws, ro: ws }
@@ -200,10 +238,133 @@ function updateListenerCounts() {
   broadcastToAll({ type: "listeners-count", listeners: counts });
 }
 
+function handleWsIdentify(ws, data) {
+  if (data.type !== "identify" || !data.clientId) return false;
+  ws.id = data.clientId;
+  console.log(`🆔 Cliente reconectado con ID persistente: ${ws.id}`);
+  flushQueue(ws);
+  return true;
+}
+
+function handleWsClientPing(data) {
+  return data.type === "ping";
+}
+
+function handleWsBroadcasterRegister(ws, data) {
+  if (data.type !== "broadcaster" || !data.language || !data.token) return false;
+  const decoded = verifyToken(data.token);
+  if (decoded?.role !== "broadcaster") {
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: "Token inválido o sin permisos",
+      })
+    );
+    return true;
+  }
+
+  ws.isBroadcaster = true;
+  ws.language = data.language;
+  broadcasters[data.language] = ws;
+  activeBroadcasts[data.language] = true;
+
+  console.log(`🎙️ Broadcaster autorizado para ${data.language}: ${ws.id}`);
+  broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
+  return true;
+}
+
+function handleWsStopBroadcast(data) {
+  if (data.type !== "stop-broadcast" || !data.language) return false;
+  broadcasters[data.language] = null;
+  activeBroadcasts[data.language] = false;
+  console.log(`🛑 Transmisión detenida para ${data.language}`);
+  broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
+  return true;
+}
+
+function handleWsRequestOffer(ws, data) {
+  if (data.type !== "request-offer" || !data.language) return false;
+  ws.language = data.language;
+  updateListenerCounts();
+
+  const targetBroadcaster = broadcasters[data.language];
+  if (targetBroadcaster?.readyState === WS_OPEN) {
+    targetBroadcaster.send(
+      JSON.stringify({
+        type: "request-offer",
+        clientId: ws.id,
+        language: data.language,
+      })
+    );
+    console.log(
+      `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
+    );
+  } else {
+    console.warn(
+      `⚠️ No hay Broadcaster activo para idioma ${data.language}`
+    );
+  }
+  return true;
+}
+
+function handleWsStopListening(ws, data) {
+  if (data.type !== "stop-listening" || !data.language) return false;
+  if (ws.language !== data.language) return true;
+
+  ws.language = null;
+  updateListenerCounts();
+  console.log(`🛑 Listener dejó de escuchar ${data.language}`);
+
+  const bc = broadcasters[data.language];
+  if (bc?.readyState === WS_OPEN) {
+    bc.send(
+      JSON.stringify({
+        type: "stop-connection",
+        target: ws.id,
+      })
+    );
+  }
+  return true;
+}
+
+function handleWsSignalingRelay(ws, data) {
+  if (!["offer", "answer", "candidate"].includes(data.type)) return false;
+
+  const targetClient = [...wss.clients].find((c) => c.id === data.target);
+
+  if (targetClient?.readyState !== WS_OPEN) {
+    console.warn(
+      `⚠️ Target ${data.target} no disponible para ${data.type}. Guardando en buffer...`
+    );
+    pushToQueue(data.target, { ...data, clientId: ws.id });
+    return true;
+  }
+
+  if (
+    ws.language &&
+    targetClient.language &&
+    ws.language === targetClient.language
+  ) {
+    targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
+    console.log(
+      `➡️ ${data.type} (${ws.language}) reenviado de ${ws.id} a ${data.target}`
+    );
+  } else {
+    console.warn(
+      `⚠️ Idioma no coincide entre ${ws.id} y ${data.target}, mensaje ignorado`
+    );
+  }
+  return true;
+}
+
 wss.on("connection", (ws) => {
   ws.id = uuidv4();
   ws.isBroadcaster = false;
   ws.language = null;
+  touchClientActivity(ws);
+  ws.on("pong", () => {
+    touchClientActivity(ws);
+  });
 
   console.log(`🔗 Cliente conectado: ${ws.id}`);
 
@@ -214,6 +375,7 @@ wss.on("connection", (ws) => {
   updateListenerCounts();
 
   ws.on("message", (msg) => {
+    touchClientActivity(ws);
     let data;
     try {
       data = JSON.parse(msg.toString());
@@ -222,136 +384,13 @@ wss.on("connection", (ws) => {
     }
     console.log(`📩 Mensaje recibido de ${ws.id}:`, data);
 
-    // ==========================
-    // Identificar Cliente (Persistencia de ID)
-    // ==========================
-    if (data.type === "identify" && data.clientId) {
-      ws.id = data.clientId;
-      console.log(`🆔 Cliente reconectado con ID persistente: ${ws.id}`);
-      flushQueue(ws); // Entregar mensajes que llegaron mientras estaba offline
-      return;
-    }
-
-    // Heartbeat from clients (keeps Render free tier awake)
-    if (data.type === "ping") {
-      return;
-    }
-
-    // ==========================
-    // Registrar Broadcaster (con JWT)
-    // ==========================
-    if (data.type === "broadcaster" && data.language && data.token) {
-      const decoded = verifyToken(data.token);
-      if (!decoded || decoded.role !== "broadcaster") {
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            message: "Token inválido o sin permisos",
-          })
-        );
-        return;
-      }
-
-      ws.isBroadcaster = true;
-      ws.language = data.language;
-      broadcasters[data.language] = ws;
-      activeBroadcasts[data.language] = true;
-
-      console.log(`🎙️ Broadcaster autorizado para ${data.language}: ${ws.id}`);
-      broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
-      return;
-    }
-
-    // ==========================
-    // Detener transmisión manualmente
-    // ==========================
-    if (data.type === "stop-broadcast" && data.language) {
-      broadcasters[data.language] = null;
-      activeBroadcasts[data.language] = false;
-      console.log(`🛑 Transmisión detenida para ${data.language}`);
-      broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
-      return;
-    }
-
-    // ==========================
-    // Listener solicita oferta de un idioma
-    // ==========================
-    if (data.type === "request-offer" && data.language) {
-      ws.language = data.language;
-      updateListenerCounts();
-
-      const targetBroadcaster = broadcasters[data.language];
-      if (targetBroadcaster && targetBroadcaster.readyState === WS_OPEN) {
-        targetBroadcaster.send(
-          JSON.stringify({
-            type: "request-offer",
-            clientId: ws.id,
-            language: data.language,
-          })
-        );
-        console.log(
-          `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
-        );
-      } else {
-        console.warn(
-          `⚠️ No hay Broadcaster activo para idioma ${data.language}`
-        );
-      }
-      return;
-    }
-
-    // ==========================
-    // Listener deja de escuchar
-    // ==========================
-    if (data.type === "stop-listening" && data.language) {
-      if (ws.language === data.language) {
-        ws.language = null;
-        updateListenerCounts();
-        console.log(`🛑 Listener dejó de escuchar ${data.language}`);
-
-        // 🔥 AVISAR AL BROADCASTER QUE CORTE EL peerConnection
-        const bc = broadcasters[data.language];
-        if (bc && bc.readyState === WS_OPEN) {
-          bc.send(
-            JSON.stringify({
-              type: "stop-connection",
-              target: ws.id,
-            })
-          );
-        }
-      }
-      return;
-    }
-
-    // ==========================
-    // Reenvío de offer/answer/candidate
-    // ==========================
-    if (["offer", "answer", "candidate"].includes(data.type)) {
-      const targetClient = [...wss.clients].find((c) => c.id === data.target);
-      
-      if (!targetClient || targetClient.readyState !== WS_OPEN) {
-        // 🔴 MEJORA: En lugar de dar error, guardar en el buffer
-        console.warn(`⚠️ Target ${data.target} no disponible para ${data.type}. Guardando en buffer...`);
-        pushToQueue(data.target, { ...data, clientId: ws.id });
-        return;
-      }
-
-      if (
-        ws.language &&
-        targetClient.language &&
-        ws.language === targetClient.language
-      ) {
-        targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
-        console.log(
-          `➡️ ${data.type} (${ws.language}) reenviado de ${ws.id} a ${data.target}`
-        );
-      } else {
-        console.warn(
-          `⚠️ Idioma no coincide entre ${ws.id} y ${data.target}, mensaje ignorado`
-        );
-      }
-      return;
-    }
+    if (handleWsIdentify(ws, data)) return;
+    if (handleWsClientPing(data)) return;
+    if (handleWsBroadcasterRegister(ws, data)) return;
+    if (handleWsStopBroadcast(data)) return;
+    if (handleWsRequestOffer(ws, data)) return;
+    if (handleWsStopListening(ws, data)) return;
+    handleWsSignalingRelay(ws, data);
   });
 
   ws.on("close", () => {
