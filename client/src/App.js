@@ -390,7 +390,7 @@ function App() {
                   <FaApple size={22} />
                   App Store
                 </a>
-                <a href="#" target="_blank" rel="noopener noreferrer" className="app-download-btn btn-android" title="Descargar para Android">
+                <a href="https://play.google.com/store/apps/details?id=com.cds.eben_ezer_live" target="_blank" rel="noopener noreferrer" className="app-download-btn btn-android" title="Descargar para Android">
                   <FaAndroid size={22} />
                   Play Store
                 </a>
