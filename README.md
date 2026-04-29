@@ -80,6 +80,36 @@ Certificado SSL válido (Render lo genera automáticamente)
 
 Navegador compatible con WebRTC (Chrome, Firefox, Edge, Safari)
 
+### Producción: Render, domingo concurrido y qué revisar
+
+**Por qué puede fallar con mucha gente (ej. domingo con audiencia alta)**
+
+El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va entre navegadores/apps con Metered y P2P. Eso limita la CPU necesaria en el servidor, pero:
+
+1. **Plan gratis en Render**  
+   La instancia **duerme** tras ~15 minutos sin tráfico. La primera conexión del día puede tardar en arrancar (cold start). En una misa con todos entrando a la vez, muchos ven errores de conexión si el servicio estaba dormido o sobrecargado al despertar.  
+   **Recomendación:** usar un plan **Starter** (o superior) para que el servicio esté **siempre activo** el día del culto, o programar un “wake” previo (p. ej. peticiones HTTPS unos minutos antes) si solo tienes gratis.
+
+2. **Límites de RAM / CPU / timeouts del proxy**  
+   Con docenas de WebSockets abiertos, cualquier sobrecarga (muchísimos `console.log`, broadcasts muy frecuentes hacia todos los clientes, picos de reconexión) puede acercarse al techo del tier gratis.
+
+3. **Sin registros históricos en el repo**  
+   Para saber con seguridad qué pasó el **domingo 26 de abril de 2026**, hay que revisar **los logs de Render** en ese intervalo (dashboard → tu Web Service → Logs / Metrics): errores 502/503, OOM, restarts, conteos de conexiones WebSocket.
+
+**Mejoras aplicadas en el servidor**
+
+- **Debouncing del mensaje `listeners-count`** para que reconectar muchos oyentes no dispare un broadcast global por usuario en cascada (menos tráfico WS cuando hay pico).
+- **Menos logging por defecto en producción** (mensajes por cliente ocultos salvo `SIGNALING_VERBOSE=1`).
+- **`GET /health`**, antes del SPA (`index.html`), devuelve JSON (`ok`, `uptimeSeconds`, `websocketClients`) para vigilar uptime desde cron u otros sistemas.
+
+**Variables útiles en Render**
+
+| Variable | Uso |
+|----------|-----|
+| `NODE_ENV=production` | Comportamiento típico de Node en producción; con el servidor actual reduce logs por defecto. |
+| `SIGNALING_VERBOSE=1` | Volver a los logs detallados por cliente si necesitas investigar un incidente. |
+| `LISTENER_COUNT_DEBOUNCE_MS` | Ms entre refrescos agrupados del conteo (por defecto 500). |
+
 📄 Estructura del Proyecto (Ejemplo)
 ├── server/
 │   ├── index.js          # Servidor de señalización con WebSocket
