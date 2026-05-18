@@ -13,6 +13,11 @@ import {
   findStandbyBroadcaster,
   parseStaleAfterMs,
 } from "./broadcasterStandby.js";
+import {
+  buildSignalingMetricsPayload,
+  recordBroadcasterRegistration,
+  recordSignalingError,
+} from "./signalingMetrics.js";
 
 dotenv.config();
 
@@ -111,6 +116,9 @@ app.get("/next-event", async (req, res) => {
     }
   } catch (err) {
     console.error("Error obteniendo fecha:", err);
+    recordSignalingError(
+      err instanceof Error ? err.message : "Firestore next-event read failed"
+    );
     res.json({ date: "2025-10-15T12:00:00" });
   }
 });
@@ -133,6 +141,9 @@ app.post("/next-event", async (req, res) => {
     res.json({ success: true, date });
   } catch (err) {
     console.error("Error guardando fecha:", err);
+    recordSignalingError(
+      err instanceof Error ? err.message : "Firestore next-event write failed"
+    );
     res.status(500).json({ error: "Error guardando fecha" });
   }
 });
@@ -155,6 +166,16 @@ const server = app.listen(PORT, () => {
 
 const wss = new WebSocketServer({ server });
 
+wss.on("error", (err) => {
+  recordSignalingError(
+    err instanceof Error ? err.message : "WebSocketServer error"
+  );
+  console.error("❌ WebSocketServer error:", err);
+});
+
+const broadcasters = {}; // { es: ws, en: ws, ro: ws }
+const activeBroadcasts = { es: false, en: false, ro: false };
+
 app.get("/health", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.status(200).json({
@@ -162,6 +183,20 @@ app.get("/health", (_req, res) => {
     uptimeSeconds: Math.floor(process.uptime()),
     websocketClients: wss.clients.size,
   });
+});
+
+// Operational snapshot (JSON): same host as the app, e.g. https://<host>/signaling/metrics
+// or http://localhost:<PORT>/signaling/metrics — not linked from the SPA; use for monitoring.
+app.get("/signaling/metrics", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).json(
+    buildSignalingMetricsPayload({
+      clients: wss.clients,
+      broadcasters,
+      uptimeSeconds: Math.floor(process.uptime()),
+      totalConnections: wss.clients.size,
+    })
+  );
 });
 
 app.get("/*", (req, res) => {
@@ -205,18 +240,15 @@ const heartbeatInterval = setInterval(() => {
     try {
       client.ping();
     } catch (err) {
+      recordSignalingError(
+        err instanceof Error ? err.message : "WebSocket ping failed"
+      );
       console.warn("⚠️ WebSocket ping failed:", err);
     }
   });
 }, WS_STALE_CHECK_MS);
 
 server.on("close", () => clearInterval(heartbeatInterval));
-
-// Mapa de Broadcasters por idioma
-const broadcasters = {}; // { es: ws, en: ws, ro: ws }
-
-// 🔹 Estado global de transmisiones activas
-const activeBroadcasts = { es: false, en: false, ro: false };
 
 // 🔹 Buffer de mensajes para clientes desconectados temporalmente (60s vida útil)
 const messageQueue = {}; // { clientId: [{msg, expiry}, ...] }
@@ -304,6 +336,9 @@ function handleWsBroadcasterRegister(ws, data) {
   if (data.type !== "broadcaster" || !data.language || !data.token) return false;
   const decoded = verifyToken(data.token);
   if (decoded?.role !== "broadcaster") {
+    recordSignalingError(
+      "Broadcaster register rejected: invalid or expired token"
+    );
     ws.send(
       JSON.stringify({
         type: "error",
@@ -320,6 +355,11 @@ function handleWsBroadcasterRegister(ws, data) {
       prev.language = null;
       prev.close(4000, "replaced_by_new_registration");
     } catch (err) {
+      recordSignalingError(
+        err instanceof Error
+          ? err.message
+          : "Failed to close replaced broadcaster socket"
+      );
       console.warn("⚠️ No se pudo cerrar el broadcaster anterior:", err);
     }
   }
@@ -331,6 +371,7 @@ function handleWsBroadcasterRegister(ws, data) {
   activeBroadcasts[data.language] = true;
 
   console.log(`🎙️ Broadcaster autorizado para ${data.language}: ${ws.id}`);
+  recordBroadcasterRegistration(data.language, ws.id);
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
   return true;
 }
