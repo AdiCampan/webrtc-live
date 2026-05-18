@@ -9,6 +9,10 @@ import cors from "cors";
 import admin from "firebase-admin";
 
 import { createDebouncedCallback } from "./listenerCountScheduler.js";
+import {
+  findStandbyBroadcaster,
+  parseStaleAfterMs,
+} from "./broadcasterStandby.js";
 
 dotenv.config();
 
@@ -172,7 +176,11 @@ const WS_OPEN = 1;
  * Idle browsers (no language yet) are not subject to the short stale window.
  */
 const WS_STALE_CHECK_MS = 15000;
-const WS_STALE_AFTER_MS = 55000;
+/** Tunable for poor WiFi; JSON pings / heartbeats normally refresh activity well before this. */
+const WS_STALE_AFTER_MS = parseStaleAfterMs(
+  process.env.WS_STALE_AFTER_MS,
+  90000
+);
 
 function touchClientActivity(ws) {
   ws.lastClientActivityAt = Date.now();
@@ -305,8 +313,20 @@ function handleWsBroadcasterRegister(ws, data) {
     return true;
   }
 
+  const prev = broadcasters[data.language];
+  if (prev && prev !== ws && prev.readyState === WS_OPEN) {
+    try {
+      prev.isBroadcaster = false;
+      prev.language = null;
+      prev.close(4000, "replaced_by_new_registration");
+    } catch (err) {
+      console.warn("⚠️ No se pudo cerrar el broadcaster anterior:", err);
+    }
+  }
+
   ws.isBroadcaster = true;
   ws.language = data.language;
+  ws.broadcasterRegisteredAt = Date.now();
   broadcasters[data.language] = ws;
   activeBroadcasts[data.language] = true;
 
@@ -453,10 +473,20 @@ wss.on("connection", (ws) => {
 
     // 🔹 Si era broadcaster, marcar como inactivo SOLO si es el actual
     if (ws.isBroadcaster && ws.language) {
-      if (broadcasters[ws.language] === ws) {
-        broadcasters[ws.language] = null;
-        activeBroadcasts[ws.language] = false;
-        logVerbose(`⚠️ Broadcaster de ${ws.language} desconectado`);
+      const lang = ws.language;
+      if (broadcasters[lang] === ws) {
+        broadcasters[lang] = null;
+        activeBroadcasts[lang] = false;
+        const replacement = findStandbyBroadcaster(wss.clients, lang, ws.id);
+        if (replacement) {
+          broadcasters[lang] = replacement;
+          activeBroadcasts[lang] = true;
+          console.log(
+            `🎙️ Broadcaster suplente activo para ${lang}: ${replacement.id}`
+          );
+        } else {
+          logVerbose(`⚠️ Broadcaster de ${lang} desconectado`);
+        }
         broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
       }
     }
