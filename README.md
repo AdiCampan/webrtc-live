@@ -109,6 +109,15 @@ El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va ent
 | `NODE_ENV=production` | Comportamiento típico de Node en producción; con el servidor actual reduce logs por defecto. |
 | `SIGNALING_VERBOSE=1` | Volver a los logs detallados por cliente si necesitas investigar un incidente. |
 | `LISTENER_COUNT_DEBOUNCE_MS` | Ms entre refrescos agrupados del conteo (por defecto 500). |
+| `WS_STALE_AFTER_MS` | Ms sin ping antes de cerrar un WS de oyente/broadcaster (por defecto 120000). |
+
+**Keep-alive automático (plan gratis)**
+
+El workflow `.github/workflows/render-keepalive.yml` hace ping a `/health` cada **14 minutos** para evitar que Render duerma el servicio entre cultos. Actívalo haciendo push a la rama principal del repo en GitHub.
+
+**Reinicios de Render**
+
+En despliegues o reinicios, el servidor envía `{ type: "server-shutdown" }` a los clientes conectados para que reconecten solos. Las apps móviles recientes lo gestionan automáticamente.
 
 📄 Estructura del Proyecto (Ejemplo)
 ├── server/

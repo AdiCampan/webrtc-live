@@ -1,0 +1,22 @@
+name: Render keep-alive
+
+on:
+  schedule:
+    # Every 14 minutes — keeps the free-tier web service awake (Render sleeps after ~15 min idle).
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake signaling server
+        env:
+          SIGNALING_HEALTH_URL: https://webrtc-live-ct59.onrender.com/health
+        run: |
+          set -euo pipefail
+          echo "Pinging ${SIGNALING_HEALTH_URL}"
+          response="$(curl -fsS --max-time 60 "${SIGNALING_HEALTH_URL}")"
+          echo "Response: ${response}"
+          echo "${response}" | grep -q '"ok":true'

@@ -18,6 +18,7 @@ import {
   recordBroadcasterRegistration,
   recordSignalingError,
 } from "./signalingMetrics.js";
+import { registerGracefulShutdown } from "./gracefulShutdown.js";
 
 dotenv.config();
 
@@ -214,7 +215,7 @@ const WS_STALE_CHECK_MS = 15000;
 /** Tunable for poor WiFi; JSON pings / heartbeats normally refresh activity well before this. */
 const WS_STALE_AFTER_MS = parseStaleAfterMs(
   process.env.WS_STALE_AFTER_MS,
-  90000
+  120000
 );
 
 function touchClientActivity(ws) {
@@ -313,11 +314,11 @@ const listenerCountNotifier = createDebouncedCallback(
   parseListenerCountDebounceMs()
 );
 
-process.once("SIGTERM", () => {
-  listenerCountNotifier.flush();
-});
-process.once("SIGINT", () => {
-  listenerCountNotifier.flush();
+registerGracefulShutdown({
+  server,
+  wss,
+  heartbeatInterval,
+  onBeforeClose: () => listenerCountNotifier.flush(),
 });
 
 function handleWsIdentify(ws, data) {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test listenerCountScheduler.test.js broadcasterStandby.test.js signalingMetrics.test.js"
+    "test": "node --test listenerCountScheduler.test.js broadcasterStandby.test.js signalingMetrics.test.js gracefulShutdown.test.js"
   },
   "keywords": [],
   "author": "",
