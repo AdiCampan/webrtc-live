@@ -32,6 +32,8 @@ const rtcConfig = {
   ].filter(Boolean),
 };
 
+const LISTENER_REGISTRATION_MS = 25 * 1000;
+
 function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
   const pcRef = useRef(null);
   const audioRef = useRef(null);
@@ -64,6 +66,30 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
     }));
     console.log("📡 Listener solicitó oferta para idioma", language, "con ID", clientId);
     setStatus("requesting");
+  };
+
+  const registerListener = () => {
+    if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    signalingServer.send(
+      JSON.stringify({ type: "register-listener", language, clientId })
+    );
+    console.log("📋 Listener re-registrado para idioma", language);
+  };
+
+  const sendListenerRegistration = () => {
+    if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    const iceState = pcRef.current?.iceConnectionState;
+    const hasHealthyIce =
+      iceState === "connected" || iceState === "completed";
+    if (hasHealthyIce) {
+      registerListener();
+    } else {
+      requestOffer();
+    }
   };
 
   const drawSpectrum = () => {
@@ -336,16 +362,8 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
         console.log("🆔 Enviada identificación persistente:", clientId);
       }
 
-      // 2. Pedir oferta (El Broadcaster decidirá si ignorarla si ya estamos conectados)
-      // Esto es necesario porque si el servidor reinicia, el Broadcaster pierde
-      // nuestra sesión aunque nosotros creamos que seguimos "connected" localmente.
-      if (signalingServer.readyState === WebSocket.OPEN) {
-        signalingServer.send(JSON.stringify({ 
-          type: "request-offer", 
-          language, 
-          clientId 
-        }));
-      }
+      // 2. Re-register language without a new offer when WebRTC is still healthy
+      sendListenerRegistration();
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {
@@ -353,6 +371,12 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
     } else {
       signalingServer.addEventListener("open", maybeRequest, { once: true });
     }
+
+    const registrationInterval = setInterval(() => {
+      if (isStarted) {
+        registerListener();
+      }
+    }, LISTENER_REGISTRATION_MS);
     
     // 🔹 RESCUE LOOP: Intervalo de seguridad para segundo plano
     const rescueInterval = setInterval(() => {
@@ -374,6 +398,7 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
     }, 1000); // Antes 10000ms, ahora 1000ms para máxima persistencia
 
     return () => {
+      clearInterval(registrationInterval);
       clearInterval(rescueInterval);
       if (audioWorkletNodeRef.current) {
         try { audioWorkletNodeRef.current.disconnect(); } catch{}

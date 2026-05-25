@@ -10,6 +10,10 @@ import admin from "firebase-admin";
 
 import { createDebouncedCallback } from "./listenerCountScheduler.js";
 import {
+  handleRegisterListener,
+  hasActiveBroadcaster,
+} from "./registerListener.js";
+import {
   findStandbyBroadcaster,
   parseStaleAfterMs,
 } from "./broadcasterStandby.js";
@@ -314,11 +318,21 @@ const listenerCountNotifier = createDebouncedCallback(
   parseListenerCountDebounceMs()
 );
 
+const LISTENER_COUNT_REFRESH_MS = 60000;
+const listenerCountRefreshInterval = setInterval(() => {
+  if (hasActiveBroadcaster(activeBroadcasts)) {
+    updateListenerCounts();
+  }
+}, LISTENER_COUNT_REFRESH_MS);
+
 registerGracefulShutdown({
   server,
   wss,
   heartbeatInterval,
-  onBeforeClose: () => listenerCountNotifier.flush(),
+  onBeforeClose: () => {
+    clearInterval(listenerCountRefreshInterval);
+    listenerCountNotifier.flush();
+  },
 });
 
 function handleWsIdentify(ws, data) {
@@ -384,6 +398,12 @@ function handleWsStopBroadcast(data) {
   console.log(`🛑 Transmisión detenida para ${data.language}`);
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
   return true;
+}
+
+function handleWsRegisterListener(ws, data) {
+  return handleRegisterListener(ws, data, () =>
+    listenerCountNotifier.schedule()
+  );
 }
 
 function handleWsRequestOffer(ws, data) {
@@ -493,6 +513,7 @@ wss.on("connection", (ws) => {
     if (handleWsBroadcasterRegister(ws, data)) return;
     if (handleWsStopBroadcast(data)) return;
     if (handleWsRequestOffer(ws, data)) return;
+    if (handleWsRegisterListener(ws, data)) return;
     if (handleWsStopListening(ws, data)) return;
     handleWsSignalingRelay(ws, data);
   });
