@@ -19,6 +19,12 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { FaWhatsapp, FaApple, FaAndroid } from "react-icons/fa";
+import {
+  buildBroadcasterReregisterPayload,
+  isServerShutdownMessage,
+  parseServerShutdownRetryMs,
+  shouldReregisterBroadcasterOnOpen,
+} from "./signalingReconnect";
 
 function App() {
   // WebSocket
@@ -50,6 +56,7 @@ function App() {
   const broadcastingRef = useRef(false); // Para saber si estaba transmitiendo
   const lastBroadcastLangRef = useRef(null); // Guarda último idioma activo
   const lastReconnectAttemptRef = useRef(0); // Timestamp del último intento (no depende de timers)
+  const serverShutdownReconnectRef = useRef(false);
 
   const [prevCount, setPrevCount] = useState(0);
   const [pop, setPop] = useState(false);
@@ -118,6 +125,66 @@ function App() {
     }
   };
 
+  const reregisterBroadcasterIfNeeded = (socket) => {
+    if (
+      !shouldReregisterBroadcasterOnOpen({
+        role: role?.role,
+        token: user?.token,
+        wasBroadcasting: broadcastingRef.current,
+        language: lastBroadcastLangRef.current,
+      }) ||
+      socket.readyState !== WebSocket.OPEN
+    ) {
+      return;
+    }
+    try {
+      socket.send(
+        JSON.stringify(
+          buildBroadcasterReregisterPayload(
+            lastBroadcastLangRef.current,
+            user.token
+          )
+        )
+      );
+      console.log(
+        "🔄 Broadcaster re-registrado automáticamente después de reconexión"
+      );
+    } catch (e) {
+      console.warn("No se pudo re-registrar broadcaster en reconexión", e);
+    }
+  };
+
+  const forceWebSocketReconnect = (url, delayMs = 0) => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    reconnectAttemptRef.current = 0;
+
+    const reconnect = () => {
+      if (wsRef.current) {
+        try {
+          wsRef.current.onopen = null;
+          wsRef.current.onclose = null;
+          wsRef.current.onerror = null;
+          wsRef.current.onmessage = null;
+          wsRef.current.close();
+        } catch {}
+        wsRef.current = null;
+      }
+      createWebSocket(url);
+    };
+
+    if (delayMs > 0) {
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        reconnect();
+      }, delayMs);
+      return;
+    }
+    reconnect();
+  };
+
   // ----------------- WEBSOCKET -----------------
   const createWebSocket = (url) => {
     if (wsRef.current) {
@@ -141,42 +208,16 @@ function App() {
       reconnectAttemptRef.current = 0;
       startKeepalive();
 
-      // Si usuario es broadcaster y estaba transmitiendo, re-registra
-      if (
-        role?.role === "broadcaster" &&
-        user?.token &&
-        broadcastingRef.current &&
-        lastBroadcastLangRef.current
-      ) {
-        // Esperamos un poco más y verificamos que el socket siga abierto
-        setTimeout(() => {
-          try {
-            if (socket.readyState === WebSocket.OPEN) {
-              socket.send(
-                JSON.stringify({
-                  type: "broadcaster",
-                  language: lastBroadcastLangRef.current,
-                  token: user.token,
-                })
-              );
-              console.log(
-                "🔄 Broadcaster re-registrado automáticamente después de reconexión"
-              );
-            }
-          } catch (e) {
-            console.warn(
-              "No se pudo re-registrar broadcaster en reconexión",
-              e
-            );
-          }
-        }, 2000); // Espera un poco más para asegurar que server esté listo
-      }
+      reregisterBroadcasterIfNeeded(socket);
     };
 
     socket.onclose = (ev) => {
       setReconnecting(true);
       console.warn("⚠️ WebSocket cerrado", ev);
       stopKeepalive();
+      if (serverShutdownReconnectRef.current) {
+        return;
+      }
       scheduleReconnect(url);
       // NO ponemos ws a null aquí - mantenemos el socket anterior visible
       // para que el broadcaster no se oculte durante reconexión
@@ -194,6 +235,30 @@ function App() {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        if (isServerShutdownMessage(data)) {
+          const retryMs = parseServerShutdownRetryMs(data.retryAfterMs);
+          console.warn(
+            `🛑 Server shutdown notice, reconnecting in ${retryMs}ms…`
+          );
+          serverShutdownReconnectRef.current = true;
+          setReconnecting(true);
+          stopKeepalive();
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+          }
+          reconnectAttemptRef.current = 0;
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+            serverShutdownReconnectRef.current = false;
+            forceWebSocketReconnect(url, 0);
+          }, retryMs);
+          try {
+            socket.close();
+          } catch {}
+          return;
+        }
 
         // 🔹 Actualizar idiomas activos
         if (data.type === "active-broadcasts" && data.active) {
@@ -231,6 +296,7 @@ function App() {
     console.log(`🔁 Intento de reconexión #${attempt} en ${delay}ms`);
     reconnectTimeoutRef.current = setTimeout(() => {
       reconnectTimeoutRef.current = null;
+      serverShutdownReconnectRef.current = false;
       createWebSocket(url);
     }, delay);
   };
