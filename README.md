@@ -113,7 +113,7 @@ El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va ent
 
 **Keep-alive automático (plan gratis)**
 
-El workflow `.github/workflows/render-keepalive.yml` hace ping a `/health` cada **14 minutos** para evitar que Render duerma el servicio entre cultos. Actívalo haciendo push a la rama principal del repo en GitHub.
+El workflow `.github/workflows/render-keepalive.yml` hace ping a `/health` cada **10 minutos** (con reintentos y timeout ampliado para cold starts de Render) para evitar que duerma el servicio entre cultos. Actívalo haciendo push a la rama principal del repo en GitHub.
 
 **Reinicios de Render**
 
