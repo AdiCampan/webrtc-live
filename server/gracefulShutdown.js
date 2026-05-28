@@ -14,6 +14,7 @@ export function registerGracefulShutdown({
   wss,
   heartbeatInterval,
   onBeforeClose,
+  log,
 }) {
   let shuttingDown = false;
 
@@ -21,7 +22,10 @@ export function registerGracefulShutdown({
     if (shuttingDown) return;
     shuttingDown = true;
 
-    console.log(`🛑 ${signal} received, starting graceful shutdown…`);
+    const connectedClients = wss.clients.size;
+    if (log) {
+      log.warn("server.shutdown.started", { signal, connectedClients });
+    }
 
     const payload = buildServerShutdownMessage();
     wss.clients.forEach((client) => {
@@ -40,12 +44,19 @@ export function registerGracefulShutdown({
     }
 
     server.close(() => {
-      console.log("✅ HTTP server closed");
+      if (log) {
+        log.info("server.shutdown.completed", { signal });
+      }
       process.exit(0);
     });
 
     setTimeout(() => {
-      console.warn("⚠️ Graceful shutdown timed out, forcing exit");
+      if (log) {
+        log.error("server.shutdown.timeout", {
+          signal,
+          timeoutMs: 10000,
+        });
+      }
       process.exit(1);
     }, 10000).unref();
   };

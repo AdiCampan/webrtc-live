@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./Listener.css";
 import { v4 as uuidv4 } from "uuid";
+import { resolveStreamRecoveryAction, shouldRequestOfferOnBroadcastActive } from "./signalingReconnect";
 
 const rtcConfig = {
   iceServers: [
@@ -76,20 +77,6 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       JSON.stringify({ type: "register-listener", language, clientId })
     );
     console.log("📋 Listener re-registrado para idioma", language);
-  };
-
-  const sendListenerRegistration = () => {
-    if (!signalingServer || signalingServer.readyState !== WebSocket.OPEN) {
-      return;
-    }
-    const iceState = pcRef.current?.iceConnectionState;
-    const hasHealthyIce =
-      iceState === "connected" || iceState === "completed";
-    if (hasHealthyIce) {
-      registerListener();
-    } else {
-      requestOffer();
-    }
   };
 
   const drawSpectrum = () => {
@@ -237,6 +224,27 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       }
       console.log("📩 Listener recibió:", data);
 
+      if (data.type === "active-broadcasts" && data.active) {
+        const isActive = Boolean(data.active[language]);
+        if (
+          isActive &&
+          shouldRequestOfferOnBroadcastActive(
+            language,
+            {
+              es: !!data.active.es,
+              en: !!data.active.en,
+              ro: !!data.active.ro,
+            },
+            Boolean(pcRef.current && audioRef.current?.srcObject),
+            pcRef.current?.iceConnectionState
+          ) &&
+          signalingServer.readyState === WebSocket.OPEN
+        ) {
+          console.log("📡 Broadcast activo de nuevo, solicitando oferta…");
+          requestOffer();
+        }
+      }
+
       if (data.type === "offer" && data.offer) {
         setStatus("connecting");
 
@@ -362,8 +370,8 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
         console.log("🆔 Enviada identificación persistente:", clientId);
       }
 
-      // 2. Re-register language without a new offer when WebRTC is still healthy
-      sendListenerRegistration();
+      // 2. Tras reconexión WS, pedir oferta nueva (signaling path was broken)
+      requestOffer();
     };
 
     if (signalingServer.readyState === WebSocket.OPEN) {
@@ -373,8 +381,19 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
     }
 
     const registrationInterval = setInterval(() => {
-      if (isStarted) {
+      if (!isStarted || signalingServer.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      const recoveryAction = resolveStreamRecoveryAction(
+        Boolean(language),
+        true,
+        Boolean(pcRef.current && audioRef.current?.srcObject),
+        pcRef.current?.iceConnectionState
+      );
+      if (recoveryAction === "register-listener") {
         registerListener();
+      } else if (recoveryAction === "request-offer") {
+        requestOffer();
       }
     }, LISTENER_REGISTRATION_MS);
     

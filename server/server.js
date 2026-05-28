@@ -9,9 +9,21 @@ import cors from "cors";
 import admin from "firebase-admin";
 
 import { createDebouncedCallback } from "./listenerCountScheduler.js";
+import { createClientSessionStore } from "./clientSessions.js";
+import { applyClientIdentify } from "./identifyClient.js";
+import { canRelaySignaling } from "./signalingRelay.js";
 import {
+  buildStopConnectionPayload,
+  isSignalingTargetOnline,
+  resolveBroadcasterSocket,
+  shouldBufferSignalingForTarget,
+  shouldNotifyBroadcasterOnListenerClose,
+} from "./signalingTarget.js";
+import {
+  clearListenerSession,
   handleRegisterListener,
   hasActiveBroadcaster,
+  persistListenerLanguage,
 } from "./registerListener.js";
 import {
   findStandbyBroadcaster,
@@ -23,17 +35,21 @@ import {
   recordSignalingError,
 } from "./signalingMetrics.js";
 import { registerGracefulShutdown } from "./gracefulShutdown.js";
+import {
+  buildClientLogContext,
+  createSignalingLogger,
+  describeCloseCode,
+  errorFields,
+  isVerboseLoggingEnabled,
+  snapshotListenerCounts,
+} from "./signalingLogger.js";
 
 dotenv.config();
 
-const SIGNALING_VERBOSE =
-  process.env.SIGNALING_VERBOSE === "1" ||
-  process.env.SIGNALING_VERBOSE === "true";
-
-function logVerbose(...args) {
-  if (process.env.NODE_ENV === "production" && !SIGNALING_VERBOSE) return;
-  console.log(...args);
-}
+const signalingLog = createSignalingLogger({
+  verboseEnabled: isVerboseLoggingEnabled(process.env.SIGNALING_VERBOSE),
+  onErrorRecorded: recordSignalingError,
+});
 
 // 🔹 Definir __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -96,7 +112,7 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-console.log("✅ Conectado a Firebase Firestore");
+signalingLog.info("server.firebase.connected");
 
 function parseListenerCountDebounceMs() {
   const raw = Number.parseInt(process.env.LISTENER_COUNT_DEBOUNCE_MS ?? "500", 10);
@@ -120,7 +136,11 @@ app.get("/next-event", async (req, res) => {
       res.json({ date: defaultDate });
     }
   } catch (err) {
-    console.error("Error obteniendo fecha:", err);
+    signalingLog.error("server.firestore.read_failed", {
+      collection: "events",
+      doc: "next-event",
+      ...errorFields(err),
+    });
     recordSignalingError(
       err instanceof Error ? err.message : "Firestore next-event read failed"
     );
@@ -142,10 +162,14 @@ app.post("/next-event", async (req, res) => {
       date, 
       updatedAt: admin.firestore.FieldValue.serverTimestamp() 
     });
-    console.log("📅 Nueva fecha guardada en Firestore:", date);
+    signalingLog.verbose("server.firestore.event_updated", { date });
     res.json({ success: true, date });
   } catch (err) {
-    console.error("Error guardando fecha:", err);
+    signalingLog.error("server.firestore.write_failed", {
+      collection: "events",
+      doc: "next-event",
+      ...errorFields(err),
+    });
     recordSignalingError(
       err instanceof Error ? err.message : "Firestore next-event write failed"
     );
@@ -162,24 +186,34 @@ app.post("/next-event", async (req, res) => {
 const clientBuildPath = path.join(__dirname, "../client/build");
 app.use(express.static(clientBuildPath));
 
+const WS_OPEN = 1;
+const WS_STALE_CHECK_MS = 15000;
+const WS_STALE_AFTER_MS = parseStaleAfterMs(
+  process.env.WS_STALE_AFTER_MS,
+  120000
+);
+
 // =====================================================
 // 🌐 WebSocket Server
 // =====================================================
 const server = app.listen(PORT, () => {
-  console.log(`Servidor HTTP + WebSocket escuchando en puerto ${PORT}`);
+  signalingLog.info("server.started", {
+    port: PORT,
+    wsStaleAfterMs: WS_STALE_AFTER_MS,
+    wsStaleCheckMs: WS_STALE_CHECK_MS,
+    verboseLogging: signalingLog.verboseEnabled,
+  });
 });
 
 const wss = new WebSocketServer({ server });
 
 wss.on("error", (err) => {
-  recordSignalingError(
-    err instanceof Error ? err.message : "WebSocketServer error"
-  );
-  console.error("❌ WebSocketServer error:", err);
+  signalingLog.error("ws.server.error", errorFields(err));
 });
 
 const broadcasters = {}; // { es: ws, en: ws, ro: ws }
 const activeBroadcasts = { es: false, en: false, ro: false };
+const clientSessions = createClientSessionStore();
 
 app.get("/health", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -208,20 +242,6 @@ app.get("/*", (req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
-const WS_OPEN = 1;
-
-/**
- * Force-quit (e.g. iOS app switcher) often drops TCP without firing WS "close" promptly.
- * Track last client activity; terminate stale signaling sockets so listener counts recover.
- * Idle browsers (no language yet) are not subject to the short stale window.
- */
-const WS_STALE_CHECK_MS = 15000;
-/** Tunable for poor WiFi; JSON pings / heartbeats normally refresh activity well before this. */
-const WS_STALE_AFTER_MS = parseStaleAfterMs(
-  process.env.WS_STALE_AFTER_MS,
-  120000
-);
-
 function touchClientActivity(ws) {
   ws.lastClientActivityAt = Date.now();
 }
@@ -237,18 +257,26 @@ const heartbeatInterval = setInterval(() => {
     if (shouldEnforceStaleDisconnect(client)) {
       const last = client.lastClientActivityAt ?? 0;
       if (now - last > WS_STALE_AFTER_MS) {
-        console.warn(`💀 Terminating stale WebSocket: ${client.id}`);
-        client.terminate();
+        signalingLog.warn("ws.client.stale_closed", {
+          ...buildClientLogContext(client),
+          staleThresholdMs: WS_STALE_AFTER_MS,
+          listeners: snapshotListenerCounts(wss.clients),
+        });
+        try {
+          client.close(4001, "stale_connection");
+        } catch {
+          client.terminate();
+        }
         return;
       }
     }
     try {
       client.ping();
     } catch (err) {
-      recordSignalingError(
-        err instanceof Error ? err.message : "WebSocket ping failed"
-      );
-      console.warn("⚠️ WebSocket ping failed:", err);
+      signalingLog.warn("ws.ping.failed", {
+        ...buildClientLogContext(client),
+        ...errorFields(err),
+      });
     }
   });
 }, WS_STALE_CHECK_MS);
@@ -258,6 +286,44 @@ server.on("close", () => clearInterval(heartbeatInterval));
 // 🔹 Buffer de mensajes para clientes desconectados temporalmente (60s vida útil)
 const messageQueue = {}; // { clientId: [{msg, expiry}, ...] }
 
+function clearMessageQueueForTarget(targetId) {
+  delete messageQueue[targetId];
+}
+
+function notifyBroadcasterStopListener(listenerId, options = {}) {
+  const { language, broadcasterSocket, reason = "unknown" } = options;
+  clearMessageQueueForTarget(listenerId);
+  const bc = resolveBroadcasterSocket(
+    broadcasters,
+    language,
+    broadcasterSocket
+  );
+  if (!bc) {
+    signalingLog.verbose("signaling.peer.prune_skipped", {
+      listenerId,
+      language: language ?? null,
+      reason,
+    });
+    return;
+  }
+  try {
+    bc.send(JSON.stringify(buildStopConnectionPayload(listenerId)));
+    signalingLog.info("signaling.peer.pruned", {
+      listenerId,
+      language: language ?? null,
+      reason,
+      broadcasterId: bc.id ?? null,
+    });
+  } catch (err) {
+    signalingLog.error("signaling.peer.prune_failed", {
+      listenerId,
+      language: language ?? null,
+      reason,
+      ...errorFields(err),
+    });
+  }
+}
+
 function pushToQueue(clientId, message) {
   if (!messageQueue[clientId]) messageQueue[clientId] = [];
   messageQueue[clientId].push({
@@ -266,16 +332,21 @@ function pushToQueue(clientId, message) {
   });
   // Limitar tamaño del buffer por seguridad
   if (messageQueue[clientId].length > 50) messageQueue[clientId].shift();
-  logVerbose(
-    `📥 Mensaje guardado en buffer para ${clientId} (Total: ${messageQueue[clientId].length})`
-  );
+  signalingLog.verbose("signaling.message.buffered", {
+    targetId: clientId,
+    queueSize: messageQueue[clientId].length,
+    messageType: message.type ?? null,
+  });
 }
 
 function flushQueue(ws) {
   const queue = messageQueue[ws.id];
   if (!queue || queue.length === 0) return;
 
-  logVerbose(`📤 Entregando ${queue.length} mensajes pendientes a ${ws.id}`);
+  signalingLog.verbose("signaling.message.flushed", {
+    clientId: ws.id,
+    messageCount: queue.length,
+  });
   const now = Date.now();
   queue.forEach(item => {
     if (item.expiry > now && ws.readyState === WS_OPEN) {
@@ -329,6 +400,7 @@ registerGracefulShutdown({
   server,
   wss,
   heartbeatInterval,
+  log: signalingLog,
   onBeforeClose: () => {
     clearInterval(listenerCountRefreshInterval);
     listenerCountNotifier.flush();
@@ -337,8 +409,36 @@ registerGracefulShutdown({
 
 function handleWsIdentify(ws, data) {
   if (data.type !== "identify" || !data.clientId) return false;
-  ws.id = data.clientId;
-  logVerbose(`🆔 Cliente reconectado con ID persistente: ${ws.id}`);
+
+  const { replacedDuplicate, restoredLanguage } = applyClientIdentify({
+    ws,
+    clientId: data.clientId,
+    clients: wss.clients,
+    sessionStore: clientSessions,
+    onDuplicateClosed: (clientId) => {
+      signalingLog.verbose("ws.client.duplicate_closed", { clientId });
+    },
+  });
+
+  signalingLog.verbose("ws.client.identified", {
+    clientId: ws.id,
+    replacedDuplicate,
+    restoredLanguage: restoredLanguage ?? null,
+  });
+  if (replacedDuplicate) {
+    signalingLog.warn("ws.client.duplicate_replaced", {
+      clientId: ws.id,
+      restoredLanguage: restoredLanguage ?? null,
+    });
+  }
+  if (restoredLanguage) {
+    signalingLog.info("ws.client.language_restored", {
+      clientId: ws.id,
+      language: restoredLanguage,
+    });
+    listenerCountNotifier.schedule();
+  }
+
   flushQueue(ws);
   return true;
 }
@@ -351,6 +451,11 @@ function handleWsBroadcasterRegister(ws, data) {
   if (data.type !== "broadcaster" || !data.language || !data.token) return false;
   const decoded = verifyToken(data.token);
   if (decoded?.role !== "broadcaster") {
+    signalingLog.warn("auth.broadcaster_rejected", {
+      clientId: ws.id,
+      language: data.language,
+      reason: "invalid_or_expired_token",
+    });
     recordSignalingError(
       "Broadcaster register rejected: invalid or expired token"
     );
@@ -369,13 +474,17 @@ function handleWsBroadcasterRegister(ws, data) {
       prev.isBroadcaster = false;
       prev.language = null;
       prev.close(4000, "replaced_by_new_registration");
+      signalingLog.info("broadcaster.replaced_previous", {
+        language: data.language,
+        previousClientId: prev.id,
+        newClientId: ws.id,
+      });
     } catch (err) {
-      recordSignalingError(
-        err instanceof Error
-          ? err.message
-          : "Failed to close replaced broadcaster socket"
-      );
-      console.warn("⚠️ No se pudo cerrar el broadcaster anterior:", err);
+      signalingLog.error("broadcaster.replace_previous_failed", {
+        language: data.language,
+        previousClientId: prev.id,
+        ...errorFields(err),
+      });
     }
   }
 
@@ -385,7 +494,11 @@ function handleWsBroadcasterRegister(ws, data) {
   broadcasters[data.language] = ws;
   activeBroadcasts[data.language] = true;
 
-  console.log(`🎙️ Broadcaster autorizado para ${data.language}: ${ws.id}`);
+  signalingLog.info("broadcaster.registered", {
+    language: data.language,
+    clientId: ws.id,
+    listeners: snapshotListenerCounts(wss.clients),
+  });
   recordBroadcasterRegistration(data.language, ws.id);
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
   return true;
@@ -395,20 +508,26 @@ function handleWsStopBroadcast(data) {
   if (data.type !== "stop-broadcast" || !data.language) return false;
   broadcasters[data.language] = null;
   activeBroadcasts[data.language] = false;
-  console.log(`🛑 Transmisión detenida para ${data.language}`);
+  signalingLog.info("broadcaster.stopped", {
+    language: data.language,
+    listeners: snapshotListenerCounts(wss.clients),
+  });
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
   return true;
 }
 
 function handleWsRegisterListener(ws, data) {
-  return handleRegisterListener(ws, data, () =>
-    listenerCountNotifier.schedule()
+  return handleRegisterListener(
+    ws,
+    data,
+    () => listenerCountNotifier.schedule(),
+    clientSessions
   );
 }
 
 function handleWsRequestOffer(ws, data) {
   if (data.type !== "request-offer" || !data.language) return false;
-  ws.language = data.language;
+  persistListenerLanguage(ws, data.language, clientSessions);
   listenerCountNotifier.schedule();
 
   const targetBroadcaster = broadcasters[data.language];
@@ -420,13 +539,17 @@ function handleWsRequestOffer(ws, data) {
         language: data.language,
       })
     );
-    logVerbose(
-      `📡 Solicitud de oferta enviada al Broadcaster ${data.language} para oyente ${ws.id}`
-    );
+    signalingLog.verbose("signaling.offer.requested", {
+      language: data.language,
+      listenerId: ws.id,
+      broadcasterId: targetBroadcaster.id,
+    });
   } else {
-    console.warn(
-      `⚠️ No hay Broadcaster activo para idioma ${data.language}`
-    );
+    signalingLog.warn("signaling.offer.no_broadcaster", {
+      language: data.language,
+      listenerId: ws.id,
+      activeBroadcasts: { ...activeBroadcasts },
+    });
   }
   return true;
 }
@@ -435,9 +558,13 @@ function handleWsStopListening(ws, data) {
   if (data.type !== "stop-listening" || !data.language) return false;
   if (ws.language !== data.language) return true;
 
-  ws.language = null;
+  clearListenerSession(ws, clientSessions);
   listenerCountNotifier.schedule();
-  logVerbose(`🛑 Listener dejó de escuchar ${data.language}`);
+  signalingLog.info("listener.stopped", {
+    clientId: ws.id,
+    language: data.language,
+    listeners: snapshotListenerCounts(wss.clients),
+  });
 
   const bc = broadcasters[data.language];
   if (bc?.readyState === WS_OPEN) {
@@ -456,27 +583,52 @@ function handleWsSignalingRelay(ws, data) {
 
   const targetClient = [...wss.clients].find((c) => c.id === data.target);
 
-  if (targetClient?.readyState !== WS_OPEN) {
-    console.warn(
-      `⚠️ Target ${data.target} no disponible para ${data.type}. Guardando en buffer...`
-    );
-    pushToQueue(data.target, { ...data, clientId: ws.id });
+  if (!isSignalingTargetOnline(wss.clients, data.target)) {
+    if (ws.isBroadcaster) {
+      notifyBroadcasterStopListener(data.target, {
+        language: ws.language,
+        broadcasterSocket: ws,
+        reason: "signaling_target_offline",
+      });
+      return true;
+    }
+
+    if (shouldBufferSignalingForTarget(wss.clients, data.target)) {
+      signalingLog.verbose("signaling.relay.buffered", {
+        messageType: data.type,
+        fromClientId: ws.id,
+        targetId: data.target,
+      });
+      pushToQueue(data.target, { ...data, clientId: ws.id });
+      return true;
+    }
+
+    signalingLog.verbose("signaling.relay.dropped", {
+      messageType: data.type,
+      fromClientId: ws.id,
+      targetId: data.target,
+    });
     return true;
   }
 
-  if (
-    ws.language &&
-    targetClient.language &&
-    ws.language === targetClient.language
-  ) {
+  if (canRelaySignaling(ws, targetClient, clientSessions)) {
     targetClient.send(JSON.stringify({ ...data, clientId: ws.id }));
-    logVerbose(
-      `➡️ ${data.type} (${ws.language}) reenviado de ${ws.id} a ${data.target}`
-    );
+    signalingLog.verbose("signaling.relay.forwarded", {
+      messageType: data.type,
+      fromClientId: ws.id,
+      targetId: data.target,
+      language: ws.language ?? targetClient.language ?? null,
+    });
   } else {
-    console.warn(
-      `⚠️ Idioma no coincide entre ${ws.id} y ${data.target}, mensaje ignorado`
-    );
+    signalingLog.warn("signaling.relay.language_mismatch", {
+      messageType: data.type,
+      fromClientId: ws.id,
+      fromLanguage: ws.language ?? clientSessions.getListenerLanguage(ws.id),
+      targetId: data.target,
+      targetLanguage:
+        targetClient.language ??
+        clientSessions.getListenerLanguage(data.target),
+    });
   }
   return true;
 }
@@ -485,12 +637,16 @@ wss.on("connection", (ws) => {
   ws.id = uuidv4();
   ws.isBroadcaster = false;
   ws.language = null;
+  ws.connectedAt = Date.now();
   touchClientActivity(ws);
   ws.on("pong", () => {
     touchClientActivity(ws);
   });
 
-  logVerbose(`🔗 Cliente conectado: ${ws.id}`);
+  signalingLog.verbose("ws.client.connected", {
+    clientId: ws.id,
+    totalConnections: wss.clients.size,
+  });
 
   // 🔹 Enviar estado actual al nuevo cliente
   ws.send(
@@ -504,9 +660,15 @@ wss.on("connection", (ws) => {
     try {
       data = JSON.parse(msg.toString());
     } catch {
+      signalingLog.verbose("ws.message.parse_failed", {
+        clientId: ws.id,
+      });
       return;
     }
-    logVerbose(`📩 Mensaje recibido de ${ws.id}:`, data);
+    signalingLog.verbose("ws.message.received", {
+      clientId: ws.id,
+      messageType: data.type ?? null,
+    });
 
     if (handleWsIdentify(ws, data)) return;
     if (handleWsClientPing(data)) return;
@@ -518,23 +680,50 @@ wss.on("connection", (ws) => {
     handleWsSignalingRelay(ws, data);
   });
 
-  ws.on("close", () => {
-    logVerbose(`❌ Cliente desconectado: ${ws.id}`);
+  ws.on("close", (code, reason) => {
+    const closeReasonText = reason?.toString?.() ?? "";
+    const closeKind = describeCloseCode(code);
+    const listeners = snapshotListenerCounts(wss.clients);
 
-    // Si era un listener, actualizamos el conteo pero NO pedimos al broadcaster
-    // que cierre la conexión WebRTC. Dejamos que WebRTC intente seguir funcionando
-    // por su cuenta aunque el WebSocket se haya caído en segundo plano.
     if (!ws.isBroadcaster && ws.language) {
-      logVerbose(`🔌 Listener ${ws.id} perdió WebSocket. Manteniendo WebRTC vivo...`);
-    }
+      if (shouldNotifyBroadcasterOnListenerClose(code)) {
+        notifyBroadcasterStopListener(ws.id, {
+          language: ws.language,
+          reason: closeKind,
+        });
+      }
 
-    // 🔹 Actualizar conteo
-    if (!ws.isBroadcaster && ws.language) {
+      const disconnectPayload = {
+        ...buildClientLogContext(ws),
+        closeCode: code,
+        closeKind,
+        closeReason: closeReasonText || null,
+        intentionalStop: code === 1000,
+        listeners,
+      };
+
+      if (code === 4001) {
+        signalingLog.verbose("ws.client.disconnected", disconnectPayload);
+      } else if (code === 1000) {
+        signalingLog.info("ws.client.disconnected", disconnectPayload);
+      } else {
+        signalingLog.warn("ws.client.disconnected", disconnectPayload);
+      }
+
       ws.language = null;
       listenerCountNotifier.schedule();
+    } else if (ws.isBroadcaster && ws.language) {
+      // handled below
+    } else {
+      signalingLog.verbose("ws.client.disconnected", {
+        ...buildClientLogContext(ws),
+        closeCode: code,
+        closeKind,
+        closeReason: closeReasonText || null,
+        listeners,
+      });
     }
 
-    // 🔹 Si era broadcaster, marcar como inactivo SOLO si es el actual
     if (ws.isBroadcaster && ws.language) {
       const lang = ws.language;
       if (broadcasters[lang] === ws) {
@@ -544,11 +733,25 @@ wss.on("connection", (ws) => {
         if (replacement) {
           broadcasters[lang] = replacement;
           activeBroadcasts[lang] = true;
-          console.log(
-            `🎙️ Broadcaster suplente activo para ${lang}: ${replacement.id}`
-          );
+          signalingLog.warn("broadcaster.disconnected", {
+            language: lang,
+            clientId: ws.id,
+            closeCode: code,
+            closeKind,
+            closeReason: closeReasonText || null,
+            replacementClientId: replacement.id,
+            listeners,
+          });
         } else {
-          logVerbose(`⚠️ Broadcaster de ${lang} desconectado`);
+          signalingLog.warn("broadcaster.disconnected", {
+            language: lang,
+            clientId: ws.id,
+            closeCode: code,
+            closeKind,
+            closeReason: closeReasonText || null,
+            replacementClientId: null,
+            listeners,
+          });
         }
         broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
       }

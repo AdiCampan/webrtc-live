@@ -1,4 +1,46 @@
 export const SERVER_SHUTDOWN_DEFAULT_RETRY_MS = 3000;
+export const WS_RECONNECT_MAX_DELAY_MS = 30000;
+
+export function computeWsReconnectDelayMs(attempt) {
+  const normalized = Math.max(1, attempt);
+  return Math.min(WS_RECONNECT_MAX_DELAY_MS, 2 ** (normalized - 1) * 1000);
+}
+
+export function isIceConnectionHealthy(iceConnectionState) {
+  return (
+    iceConnectionState === "connected" || iceConnectionState === "completed"
+  );
+}
+
+export function shouldRequestOfferOnBroadcastActive(
+  language,
+  activeLangs,
+  hasRemoteStream,
+  iceConnectionState
+) {
+  if (!language || !activeLangs[language]) {
+    return false;
+  }
+  if (hasRemoteStream && isIceConnectionHealthy(iceConnectionState)) {
+    return false;
+  }
+  return true;
+}
+
+export function resolveStreamRecoveryAction(
+  hasLanguage,
+  wsOpen,
+  hasRemoteStream,
+  iceConnectionState
+) {
+  if (!hasLanguage || !wsOpen) {
+    return "none";
+  }
+  if (hasRemoteStream && isIceConnectionHealthy(iceConnectionState)) {
+    return "register-listener";
+  }
+  return "request-offer";
+}
 
 export function parseServerShutdownRetryMs(retryAfterMs) {
   if (

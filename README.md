@@ -99,17 +99,158 @@ El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va ent
 **Mejoras aplicadas en el servidor**
 
 - **Debouncing del mensaje `listeners-count`** para que reconectar muchos oyentes no dispare un broadcast global por usuario en cascada (menos tráfico WS cuando hay pico).
-- **Menos logging por defecto en producción** (mensajes por cliente ocultos salvo `SIGNALING_VERBOSE=1`).
+- **Logging estructurado en JSON** (una línea por evento) orientado a trazabilidad en Render: desconexiones, errores, caídas y limpieza de peers fantasma.
 - **`GET /health`**, antes del SPA (`index.html`), devuelve JSON (`ok`, `uptimeSeconds`, `websocketClients`) para vigilar uptime desde cron u otros sistemas.
+- **`GET /signaling/metrics`**: snapshot operativo (oyentes por idioma, broadcasters activos, último error registrado).
 
 **Variables útiles en Render**
 
 | Variable | Uso |
 |----------|-----|
-| `NODE_ENV=production` | Comportamiento típico de Node en producción; con el servidor actual reduce logs por defecto. |
-| `SIGNALING_VERBOSE=1` | Volver a los logs detallados por cliente si necesitas investigar un incidente. |
+| `NODE_ENV=production` | Comportamiento típico de Node en producción. |
+| `SIGNALING_VERBOSE=1` o `true` | Activa logs detallados (`verbose`): cada mensaje WS, relays ICE, buffers, etc. Solo para investigar incidentes. |
 | `LISTENER_COUNT_DEBOUNCE_MS` | Ms entre refrescos agrupados del conteo (por defecto 500). |
-| `WS_STALE_AFTER_MS` | Ms sin ping antes de cerrar un WS de oyente/broadcaster (por defecto 120000). |
+| `WS_STALE_AFTER_MS` | Ms sin actividad del cliente antes de cerrar un WS de oyente/broadcaster (por defecto 120000, mínimo 30000). |
+
+---
+
+## Logs estructurados (servidor de señalización)
+
+En producción, el servidor escribe **una línea JSON por evento**. Esto facilita buscar en los logs de Render y correlacionar incidentes.
+
+### Formato
+
+```json
+{
+  "ts": "2026-05-28T21:00:00.000Z",
+  "level": "warn",
+  "event": "ws.client.disconnected",
+  "clientId": "abc-123",
+  "role": "listener",
+  "language": "es",
+  "closeCode": 1006,
+  "closeKind": "abnormal_no_close_frame",
+  "idleMs": 125000,
+  "listeners": {
+    "totalListeners": 2,
+    "byLanguage": { "es": 2, "en": 0, "ro": 0 }
+  }
+}
+```
+
+| Campo | Descripción |
+|-------|-------------|
+| `ts` | Marca de tiempo ISO 8601 (UTC). |
+| `level` | `info`, `warn`, `error` o `verbose` (este último solo con `SIGNALING_VERBOSE=1`). |
+| `event` | Identificador del evento (usar para filtrar en Render). |
+| Resto | Contexto específico del evento (IDs, idioma, códigos de cierre, errores, etc.). |
+
+### Cómo buscar en Render
+
+En el dashboard del Web Service → **Logs**, busca por texto:
+
+| Objetivo | Filtro sugerido |
+|----------|-----------------|
+| Desconexiones de oyentes | `"event":"ws.client.disconnected"` |
+| Conexiones fantasma eliminadas | `"event":"ws.client.stale_closed"` |
+| Caída del broadcaster | `"event":"broadcaster.disconnected"` |
+| Reinicio/deploy del servidor | `"event":"server.shutdown.started"` |
+| Oyente sin broadcaster | `"event":"signaling.offer.no_broadcaster"` |
+| Peer fantasma limpiado | `"event":"signaling.peer.pruned"` |
+| Errores graves | `"level":"error"` |
+
+También puedes consultar en vivo: `GET https://<tu-host>/signaling/metrics` (JSON con oyentes, broadcasters y `lastError`).
+
+### Eventos que sí aparecen en producción (sin `SIGNALING_VERBOSE`)
+
+#### Arranque y apagado
+
+| Evento | Nivel | Cuándo |
+|--------|-------|--------|
+| `server.started` | info | Servidor HTTP + WebSocket listo (puerto, `wsStaleAfterMs`, etc.). |
+| `server.firebase.connected` | info | Firebase Admin inicializado. |
+| `server.shutdown.started` | warn | SIGTERM/SIGINT (deploy o reinicio en Render). Incluye `signal` y `connectedClients`. |
+| `server.shutdown.completed` | info | Apagado limpio completado. |
+| `server.shutdown.timeout` | error | Apagado forzado tras 10 s. |
+
+#### Broadcaster
+
+| Evento | Nivel | Cuándo |
+|--------|-------|--------|
+| `broadcaster.registered` | info | Broadcaster autorizado para un idioma. Incluye conteo de oyentes. |
+| `broadcaster.stopped` | info | Transmisión detenida (`stop-broadcast`). |
+| `broadcaster.disconnected` | warn | Socket del broadcaster cerrado. Incluye `closeCode`, `closeKind`, `replacementClientId` si hay suplente. |
+| `broadcaster.replaced_previous` | info | Nueva pestaña/sesión reemplazó al broadcaster anterior del mismo idioma. |
+| `broadcaster.replace_previous_failed` | error | No se pudo cerrar el broadcaster anterior. |
+
+#### Oyentes y WebSocket
+
+| Evento | Nivel | Cuándo |
+|--------|-------|--------|
+| `ws.client.disconnected` | info / warn | Oyente con idioma activo se desconecta. **info** si cierre normal (`closeCode` 1000); **warn** si anómalo. Incluye `idleMs`, `connectedDurationMs`, oyentes restantes. |
+| `ws.client.stale_closed` | warn | Conexión inactiva > `WS_STALE_AFTER_MS` (fantasma, app en segundo plano colgada, etc.). |
+| `ws.client.duplicate_replaced` | warn | Dos sockets con el mismo `clientId`; se cierra el duplicado. |
+| `ws.client.language_restored` | info | Tras `identify`, se restaura el idioma de una sesión previa. |
+| `listener.stopped` | info | Oyente envió `stop-listening` explícitamente. |
+
+#### Señalización WebRTC
+
+| Evento | Nivel | Cuándo |
+|--------|-------|--------|
+| `signaling.offer.no_broadcaster` | warn | `request-offer` sin broadcaster activo para ese idioma. |
+| `signaling.relay.language_mismatch` | warn | Offer/answer/candidate ignorado por idioma incompatible. |
+| `signaling.peer.pruned` | info | Broadcaster notificado para cerrar peer de un oyente que ya no existe (`stop-connection`). |
+
+#### Autenticación y errores
+
+| Evento | Nivel | Cuándo |
+|--------|-------|--------|
+| `auth.broadcaster_rejected` | warn | Token JWT inválido o expirado al registrar broadcaster. |
+| `ws.server.error` | error | Error del WebSocketServer. |
+| `ws.ping.failed` | warn | Fallo al enviar ping a un cliente. |
+| `server.firestore.read_failed` / `write_failed` | error | Error leyendo/escribiendo Firestore. Incluye `errorMessage` y stack truncado. |
+
+### Códigos de cierre WebSocket (`closeKind`)
+
+| `closeCode` | `closeKind` | Significado |
+|-------------|-------------|-------------|
+| 1000 | `normal_closure` | Cierre limpio (usuario para, app cierra WS). |
+| 1001 | `going_away` | Cliente se va (pestaña cerrada, etc.). |
+| 1006 | `abnormal_no_close_frame` | Conexión rota sin frame de cierre (red, app matada). |
+| 4000 | `replaced_by_new_registration` | Otro broadcaster tomó el mismo idioma. |
+| 4001 | `stale_connection` | Servidor cerró por inactividad (conexión fantasma). |
+| 4002 | `replaced_by_reconnect` | Mismo `clientId` reconectó en otro socket. |
+
+### Logs verbose (solo con `SIGNALING_VERBOSE=1`)
+
+Incluyen tráfico rutinario que no aporta en producción normal:
+
+- `ws.client.connected`, `ws.message.received`, `ws.heartbeat`
+- `signaling.relay.forwarded`, `signaling.relay.buffered`, `signaling.message.buffered`
+- `ws.client.disconnected` duplicado tras `stale_closed` (código 4001)
+
+Activa verbose **solo durante la investigación** de un incidente y desactívalo después.
+
+### App móvil (logs en dispositivo)
+
+La app usa el mismo criterio: en **producción** solo emite JSON en `warn` y `error` (desconexiones WS, ICE degradado, `server.shutdown`, reconexiones WebRTC). En desarrollo (`__DEV__`) también muestra eventos `info` y `verbose`.
+
+Eventos móviles relevantes:
+
+| Evento | Nivel | Cuándo |
+|--------|-------|--------|
+| `ws.disconnected` | warn | WebSocket cerrado. |
+| `ws.error` | warn | Error de socket. |
+| `ws.reconnect.scheduled` | info | Reintento programado (solo dev). |
+| `ws.reconnected` | info | WS vuelve tras caída; pide oferta nueva. |
+| `server.shutdown` | warn | Aviso de reinicio del servidor. |
+| `webrtc.ice.degraded` | warn | ICE `disconnected` o `failed`. |
+| `webrtc.reconnect.started` | warn | Recuperación WebRTC iniciada. |
+| `signaling.broadcast_resumed` | info | Broadcaster activo de nuevo; solicita oferta. |
+
+Para ver logs del móvil en pruebas: Xcode Console (iOS) o `adb logcat` filtrando por el JSON del evento.
+
+---
 
 **Keep-alive automático (plan gratis)**
 

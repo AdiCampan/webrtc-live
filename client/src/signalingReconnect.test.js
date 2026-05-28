@@ -1,8 +1,11 @@
 import {
   SERVER_SHUTDOWN_DEFAULT_RETRY_MS,
   buildBroadcasterReregisterPayload,
+  computeWsReconnectDelayMs,
   isServerShutdownMessage,
   parseServerShutdownRetryMs,
+  resolveStreamRecoveryAction,
+  shouldRequestOfferOnBroadcastActive,
   shouldReregisterBroadcasterOnOpen,
 } from "./signalingReconnect";
 
@@ -60,6 +63,40 @@ describe("signalingReconnect", () => {
           language: "en",
         })
       ).toBe(false);
+    });
+  });
+
+  describe("resolveStreamRecoveryAction", () => {
+    it("requests offer when listening without a healthy stream", () => {
+      expect(
+        resolveStreamRecoveryAction(true, true, false, undefined)
+      ).toBe("request-offer");
+    });
+
+    it("registers listener when stream is healthy", () => {
+      expect(
+        resolveStreamRecoveryAction(true, true, true, "connected")
+      ).toBe("register-listener");
+    });
+  });
+
+  describe("shouldRequestOfferOnBroadcastActive", () => {
+    it("returns true when broadcast resumes without stream", () => {
+      expect(
+        shouldRequestOfferOnBroadcastActive(
+          "es",
+          { es: true, en: false, ro: false },
+          false,
+          undefined
+        )
+      ).toBe(true);
+    });
+  });
+
+  describe("computeWsReconnectDelayMs", () => {
+    it("uses exponential backoff capped at 30s", () => {
+      expect(computeWsReconnectDelayMs(1)).toBe(1000);
+      expect(computeWsReconnectDelayMs(10)).toBe(30000);
     });
   });
 });
