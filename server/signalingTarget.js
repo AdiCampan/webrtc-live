@@ -54,3 +54,29 @@ export function shouldNotifyBroadcasterOnListenerClose(closeCode) {
   // 4001 = stale ghost socket; 4002 = replaced by reconnect (same clientId, skip)
   return closeCode === 4001;
 }
+
+/**
+ * When a client reconnects with the same clientId, the old socket closes with 4002
+ * after the replacement is already identified. Skip listener count updates for the
+ * ghost socket so the web dashboard does not briefly drop active listeners.
+ */
+export function hasReplacementListenerSocket(clients, closingWs, closeCode) {
+  if (closeCode !== 4002 || !closingWs.id) {
+    return false;
+  }
+  for (const client of clients) {
+    if (
+      client !== closingWs &&
+      client.id === closingWs.id &&
+      client.readyState === WS_OPEN &&
+      client.language
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function shouldUpdateListenerCountOnClose(clients, ws, closeCode) {
+  return !hasReplacementListenerSocket(clients, ws, closeCode);
+}

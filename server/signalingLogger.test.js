@@ -53,19 +53,41 @@ test("snapshotListenerCounts counts open listeners by language", () => {
   });
 });
 
+test("logSignalingEvent emits human-readable line by default", () => {
+  let output = "";
+  const original = console.log;
+  console.log = (line) => {
+    output = String(line);
+  };
+  try {
+    logSignalingEvent("info", "server.firebase.connected", {}, {
+      verboseEnabled: false,
+    });
+    assert.match(output, /Firebase conectado correctamente/);
+    assert.match(output, /server\.firebase\.connected$/);
+  } finally {
+    console.log = original;
+  }
+});
+
 test("logSignalingEvent skips verbose when disabled", () => {
   let called = 0;
+  let lastLine = "";
   const original = console.log;
-  console.log = () => {
+  console.log = (line) => {
     called += 1;
+    lastLine = String(line);
   };
   try {
     logSignalingEvent("verbose", "ws.client.connected", {}, {
       verboseEnabled: false,
     });
     assert.equal(called, 0);
-    logSignalingEvent("info", "server.started", {}, { verboseEnabled: false });
+    logSignalingEvent("info", "server.started", { port: "8080" }, {
+      verboseEnabled: false,
+    });
     assert.equal(called, 1);
+    assert.match(String(lastLine), /Servidor listo en puerto 8080/);
   } finally {
     console.log = original;
   }

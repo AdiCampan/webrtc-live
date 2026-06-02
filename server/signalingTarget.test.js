@@ -3,10 +3,12 @@ import { test } from "node:test";
 
 import {
   buildStopConnectionPayload,
+  hasReplacementListenerSocket,
   isSignalingTargetOnline,
   resolveBroadcasterSocket,
   shouldBufferSignalingForTarget,
   shouldNotifyBroadcasterOnListenerClose,
+  shouldUpdateListenerCountOnClose,
 } from "./signalingTarget.js";
 
 const WS_OPEN = 1;
@@ -52,4 +54,22 @@ test("shouldNotifyBroadcasterOnListenerClose only for stale cleanup", () => {
   assert.equal(shouldNotifyBroadcasterOnListenerClose(4001), true);
   assert.equal(shouldNotifyBroadcasterOnListenerClose(4002), false);
   assert.equal(shouldNotifyBroadcasterOnListenerClose(1000), false);
+});
+
+test("hasReplacementListenerSocket detects open replacement for 4002 closes", () => {
+  const closing = { id: "client-a", language: "es", readyState: WS_OPEN };
+  const replacement = { id: "client-a", language: "es", readyState: WS_OPEN };
+  const clients = [closing, replacement];
+
+  assert.equal(hasReplacementListenerSocket(clients, closing, 4002), true);
+  assert.equal(hasReplacementListenerSocket(clients, closing, 1006), false);
+});
+
+test("shouldUpdateListenerCountOnClose skips duplicate reconnect closes", () => {
+  const closing = { id: "client-a", language: "es", readyState: WS_OPEN };
+  const replacement = { id: "client-a", language: "es", readyState: WS_OPEN };
+  const clients = [closing, replacement];
+
+  assert.equal(shouldUpdateListenerCountOnClose(clients, closing, 4002), false);
+  assert.equal(shouldUpdateListenerCountOnClose(clients, closing, 1006), true);
 });

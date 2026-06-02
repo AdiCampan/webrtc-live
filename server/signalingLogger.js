@@ -1,31 +1,22 @@
 /**
  * Structured signaling logs for production traceability (Render, etc.).
- * One JSON line per event — grep by "event":"ws.client.disconnected".
+ * Default output is human-readable Spanish; set SIGNALING_LOG_FORMAT=json for JSON lines.
  */
 
+import {
+  formatHumanLogLine,
+  resolveLogOutputFormat,
+} from "./humanLogMessages.js";
+
 /** @typedef {'info' | 'warn' | 'error' | 'verbose'} LogLevel */
+
+export { describeCloseCode } from "./wsCloseCodes.js";
 
 /**
  * @param {string | undefined} raw
  */
 export function isVerboseLoggingEnabled(raw) {
   return raw === "1" || raw === "true";
-}
-
-/**
- * @param {number} code
- */
-export function describeCloseCode(code) {
-  /** @type {Record<number, string>} */
-  const known = {
-    1000: "normal_closure",
-    1001: "going_away",
-    1006: "abnormal_no_close_frame",
-    4000: "replaced_by_new_registration",
-    4001: "stale_connection",
-    4002: "replaced_by_reconnect",
-  };
-  return known[code] ?? `ws_close_${code}`;
 }
 
 /**
@@ -115,17 +106,31 @@ export function logSignalingEvent(
     return;
   }
 
+  const logFormat = resolveLogOutputFormat(process.env.SIGNALING_LOG_FORMAT);
   const payload = {
     ts: new Date().toISOString(),
     level,
     event,
     ...context,
   };
+  const jsonLine = JSON.stringify(payload);
+  const humanLine = formatHumanLogLine(level, event, context);
 
-  const line = JSON.stringify(payload);
+  const emit = (writer) => {
+    if (logFormat === "json") {
+      writer(jsonLine);
+      return;
+    }
+    if (logFormat === "both") {
+      writer(humanLine);
+      writer(jsonLine);
+      return;
+    }
+    writer(humanLine);
+  };
 
   if (level === "error") {
-    console.error(line);
+    emit((line) => console.error(line));
     if (typeof options.onErrorRecorded === "function") {
       options.onErrorRecorded(
         typeof context.errorMessage === "string"
@@ -137,11 +142,11 @@ export function logSignalingEvent(
   }
 
   if (level === "warn") {
-    console.warn(line);
+    emit((line) => console.warn(line));
     return;
   }
 
-  console.log(line);
+  emit((line) => console.log(line));
 }
 
 export function createSignalingLogger(options = {}) {

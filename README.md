@@ -99,7 +99,7 @@ El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va ent
 **Mejoras aplicadas en el servidor**
 
 - **Debouncing del mensaje `listeners-count`** para que reconectar muchos oyentes no dispare un broadcast global por usuario en cascada (menos tráfico WS cuando hay pico).
-- **Logging estructurado en JSON** (una línea por evento) orientado a trazabilidad en Render: desconexiones, errores, caídas y limpieza de peers fantasma.
+- **Logging legible en Render** (frases en español, una línea por evento) con slug técnico al final para filtrar; opcionalmente JSON con `SIGNALING_LOG_FORMAT=json`.
 - **`GET /health`**, antes del SPA (`index.html`), devuelve JSON (`ok`, `uptimeSeconds`, `websocketClients`) para vigilar uptime desde cron u otros sistemas.
 - **`GET /signaling/metrics`**: snapshot operativo (oyentes por idioma, broadcasters activos, último error registrado).
 
@@ -109,16 +109,32 @@ El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va ent
 |----------|-----|
 | `NODE_ENV=production` | Comportamiento típico de Node en producción. |
 | `SIGNALING_VERBOSE=1` o `true` | Activa logs detallados (`verbose`): cada mensaje WS, relays ICE, buffers, etc. Solo para investigar incidentes. |
+| `SIGNALING_LOG_FORMAT` | `human` (por defecto), `json` (línea JSON antigua) o `both` (las dos). |
 | `LISTENER_COUNT_DEBOUNCE_MS` | Ms entre refrescos agrupados del conteo (por defecto 500). |
-| `WS_STALE_AFTER_MS` | Ms sin actividad del cliente antes de cerrar un WS de oyente/broadcaster (por defecto 120000, mínimo 30000). |
+| `WS_STALE_AFTER_MS` | Ms sin actividad del cliente antes de cerrar un WS de oyente/broadcaster (por defecto 300000, mínimo 30000). |
 
 ---
 
-## Logs estructurados (servidor de señalización)
+## Logs del servidor de señalización
 
-En producción, el servidor escribe **una línea JSON por evento**. Esto facilita buscar en los logs de Render y correlacionar incidentes.
+En producción, el servidor escribe **una línea legible por evento** (español), con el identificador técnico al final para filtrar en Render. No hace falta tener el código delante para entender qué pasó.
 
-### Formato
+### Formato (por defecto)
+
+```
+2026-05-31T15:54:49.663Z [INFO] Emisión iniciada en es. Sin oyentes aún · broadcaster.registered
+2026-05-31T16:25:30.140Z [AVISO] Oyente dd1c5cb4… (es) desconectado: conexión cortada sin aviso (red o segundo plano), conectado 29 min 1 s, inactivo 26 s. Quedan 6 oyentes (es: 6) · ws.client.disconnected
+2026-05-31T16:25:30.218Z [AVISO] Reinicio o deploy en curso (SIGTERM). Clientes conectados: 0 · server.shutdown.started
+2026-05-31T16:26:23.241Z [INFO] Servidor listo en puerto 8080 (corte por inactividad WS: 300 s) · server.started
+2026-05-31T18:00:16.348Z [AVISO] Emisor es desconectado (pestaña o app cerrada). No hay otra sesión de emisión activa. Quedan 2 oyentes (es: 2) · broadcaster.disconnected
+2026-05-31T18:12:45.218Z [AVISO] Conexión fantasma cerrada: oyente dd1c5cb4… (es) sin actividad durante 2 min 15 s (límite 300 s). Quedan 1 oyente (es: 1) · ws.client.stale_closed
+```
+
+Niveles: `[INFO]`, `[AVISO]`, `[ERROR]`, `[DETALLE]` (este último solo con `SIGNALING_VERBOSE=1`).
+
+Para volver al JSON antiguo (una línea JSON por evento), define `SIGNALING_LOG_FORMAT=json`. Con `both` se imprimen las dos.
+
+### Ejemplo JSON (solo si `SIGNALING_LOG_FORMAT=json`)
 
 ```json
 {
@@ -147,17 +163,17 @@ En producción, el servidor escribe **una línea JSON por evento**. Esto facilit
 
 ### Cómo buscar en Render
 
-En el dashboard del Web Service → **Logs**, busca por texto:
+En el dashboard del Web Service → **Logs**, busca por texto en español o por el slug técnico al final de la línea:
 
 | Objetivo | Filtro sugerido |
 |----------|-----------------|
-| Desconexiones de oyentes | `"event":"ws.client.disconnected"` |
-| Conexiones fantasma eliminadas | `"event":"ws.client.stale_closed"` |
-| Caída del broadcaster | `"event":"broadcaster.disconnected"` |
-| Reinicio/deploy del servidor | `"event":"server.shutdown.started"` |
-| Oyente sin broadcaster | `"event":"signaling.offer.no_broadcaster"` |
-| Peer fantasma limpiado | `"event":"signaling.peer.pruned"` |
-| Errores graves | `"level":"error"` |
+| Desconexiones de oyentes | `desconectado` o `ws.client.disconnected` |
+| Conexiones fantasma eliminadas | `Conexión fantasma` o `ws.client.stale_closed` |
+| Caída del broadcaster | `Emisor` y `desconectado` o `broadcaster.disconnected` |
+| Reinicio/deploy del servidor | `Reinicio o deploy` o `server.shutdown.started` |
+| Oyente sin broadcaster | `no hay emisor activo` o `signaling.offer.no_broadcaster` |
+| Emisión iniciada | `Emisión iniciada` o `broadcaster.registered` |
+| Errores graves | `[ERROR]` |
 
 También puedes consultar en vivo: `GET https://<tu-host>/signaling/metrics` (JSON con oyentes, broadcasters y `lastError`).
 

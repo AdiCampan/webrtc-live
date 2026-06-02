@@ -18,6 +18,7 @@ import {
   resolveBroadcasterSocket,
   shouldBufferSignalingForTarget,
   shouldNotifyBroadcasterOnListenerClose,
+  shouldUpdateListenerCountOnClose,
 } from "./signalingTarget.js";
 import {
   clearListenerSession,
@@ -190,7 +191,7 @@ const WS_OPEN = 1;
 const WS_STALE_CHECK_MS = 15000;
 const WS_STALE_AFTER_MS = parseStaleAfterMs(
   process.env.WS_STALE_AFTER_MS,
-  120000
+  300000
 );
 
 // =====================================================
@@ -711,7 +712,9 @@ wss.on("connection", (ws) => {
       }
 
       ws.language = null;
-      listenerCountNotifier.schedule();
+      if (shouldUpdateListenerCountOnClose(wss.clients, ws, code)) {
+        listenerCountNotifier.schedule();
+      }
     } else if (ws.isBroadcaster && ws.language) {
       // handled below
     } else {
