@@ -50,21 +50,50 @@ export function formatListenerSummary(listeners) {
 export function describeCloseKindHuman(closeKind) {
   /** @type {Record<string, string>} */
   const known = {
-    normal_closure: "cierre normal",
+    normal_closure: "cierre normal (el usuario paró o cerró la app)",
     going_away: "pestaña o app cerrada",
-    abnormal_no_close_frame: "conexión cortada sin aviso (red o segundo plano)",
-    replaced_by_new_registration: "reemplazado por otra sesión de emisión",
-    stale_connection: "inactivo demasiado tiempo",
-    replaced_by_reconnect: "reconexión del mismo dispositivo",
+    abnormal_no_close_frame:
+      "señal WebSocket cortada (móvil en segundo plano, red o ahorro de batería)",
+    replaced_by_new_registration: "otra pestaña o dispositivo tomó la emisión",
+    stale_connection: "sin ping del cliente demasiado tiempo (conexión fantasma)",
+    replaced_by_reconnect: "mismo dispositivo reconectado (socket antiguo)",
   };
   return known[closeKind] ?? closeKind;
+}
+
+/**
+ * @param {import("./signalingLogger.js").LogLevel} level
+ */
+function eventEmoji(level, event) {
+  if (level === "error") {
+    return "❌";
+  }
+  if (level === "warn") {
+    if (event.startsWith("broadcaster.")) {
+      return "🎙️";
+    }
+    if (event.includes("listener") || event.includes("Oyente")) {
+      return "👂";
+    }
+    return "⚠️";
+  }
+  if (event.startsWith("broadcaster.")) {
+    return "🎙️";
+  }
+  if (event.includes("listener") || event.includes("ws.client")) {
+    return "👂";
+  }
+  if (event.startsWith("server.")) {
+    return "📡";
+  }
+  return "ℹ️";
 }
 
 /**
  * @param {string} event
  * @param {Record<string, unknown>} context
  */
-export function formatHumanLogMessage(event, context = {}) {
+export function formatHumanLogHeadline(event, context = {}) {
   const lang = context.language != null ? String(context.language) : null;
   const clientId = shortenClientId(
     typeof context.clientId === "string" ? context.clientId : null
@@ -74,28 +103,11 @@ export function formatHumanLogMessage(event, context = {}) {
       context.listeners
     )
   );
-  const listenersSuffix = listeners ? `. Quedan ${listeners}` : "";
-  const idle = formatDurationMs(
-    typeof context.idleMs === "number" ? context.idleMs : null
-  );
-  const connected = formatDurationMs(
-    typeof context.connectedDurationMs === "number"
-      ? context.connectedDurationMs
-      : null
-  );
-  const closeCode =
-    typeof context.closeCode === "number" ? context.closeCode : null;
-  const closeKind =
-    typeof context.closeKind === "string"
-      ? context.closeKind
-      : closeCode != null
-        ? describeCloseCode(closeCode)
-        : null;
-  const closeHuman = closeKind ? describeCloseKindHuman(closeKind) : null;
+  const listenersLine = listeners ? `Conteo oyentes: ${listeners}` : "";
 
   switch (event) {
     case "server.firebase.connected":
-      return "Firebase conectado correctamente";
+      return ["Firebase conectado correctamente"];
     case "server.started": {
       const port = context.port ?? "8080";
       const staleSec = Math.round(
@@ -103,40 +115,56 @@ export function formatHumanLogMessage(event, context = {}) {
           ? context.wsStaleAfterMs
           : 300000) / 1000
       );
-      return `Servidor listo en puerto ${port} (corte por inactividad WS: ${staleSec} s)`;
+      const graceSec = Math.round(
+        (typeof context.listenerBackgroundGraceMs === "number"
+          ? context.listenerBackgroundGraceMs
+          : 1_800_000) / 1000
+      );
+      return [
+        `Servidor listo en puerto ${port}`,
+        `Corte WS por inactividad: ${staleSec} s · Conteo en segundo plano: ${graceSec} s`,
+      ];
     }
     case "server.shutdown.started":
-      return `Reinicio o deploy en curso (${context.signal ?? "señal"}). Clientes conectados: ${context.connectedClients ?? 0}`;
+      return [
+        `Reinicio o deploy (${context.signal ?? "señal"})`,
+        `Clientes WS conectados en ese momento: ${context.connectedClients ?? 0}`,
+      ];
     case "server.shutdown.completed":
-      return `Apagado limpio completado (${context.signal ?? "señal"})`;
+      return [`Apagado limpio (${context.signal ?? "señal"})`];
     case "server.shutdown.timeout":
-      return `Apagado forzado tras ${formatDurationMs(typeof context.timeoutMs === "number" ? context.timeoutMs : 10000) ?? "10 s"} — algunos clientes no cerraron a tiempo`;
-    case "server.firestore.read_failed":
-      return `Error leyendo fecha del evento en Firestore: ${context.errorMessage ?? "desconocido"}`;
-    case "server.firestore.write_failed":
-      return `Error guardando fecha del evento en Firestore: ${context.errorMessage ?? "desconocido"}`;
-    case "server.firestore.event_updated":
-      return `Fecha del próximo evento actualizada: ${context.date ?? "—"}`;
+      return [
+        `Apagado forzado tras ${formatDurationMs(typeof context.timeoutMs === "number" ? context.timeoutMs : 10000) ?? "10 s"}`,
+        "Algunos clientes no cerraron a tiempo",
+      ];
     case "broadcaster.registered":
-      return `Emisión iniciada en ${lang ?? "?"}. ${listeners || "Sin oyentes aún"}`;
-    case "broadcaster.stopped":
-      return `Emisión detenida en ${lang ?? "?"}${listenersSuffix}`;
+      return [
+        `Emisión EN VIVO en ${lang ?? "?"}`,
+        listenersLine || "Sin oyentes registrados aún",
+      ];
     case "broadcaster.disconnected": {
       const replacement =
         typeof context.replacementClientId === "string"
           ? shortenClientId(context.replacementClientId)
           : null;
-      const replacementText = replacement
-        ? `. Otra sesión de emisión sigue activa (${replacement})`
-        : ". No hay otra sesión de emisión activa";
-      return `Emisor ${lang ?? "?"} desconectado (${closeHuman ?? "desconocido"})${replacementText}${listenersSuffix}`;
+      return [
+        `Emisor ${lang ?? "?"} desconectado`,
+        replacement
+          ? `Otra sesión sigue activa (${replacement})`
+          : "No queda otra sesión de emisión",
+        listenersLine,
+      ].filter(Boolean);
     }
     case "broadcaster.replaced_previous":
-      return `Nueva sesión de emisión ${lang ?? "?"} reemplazó a la anterior (${shortenClientId(typeof context.previousClientId === "string" ? context.previousClientId : null)})`;
-    case "broadcaster.replace_previous_failed":
-      return `No se pudo cerrar la sesión anterior del emisor ${lang ?? "?"}: ${context.errorMessage ?? "error desconocido"}`;
+      return [
+        `Nueva emisión ${lang ?? "?"} sustituyó a la sesión anterior`,
+        `Sesión anterior: ${shortenClientId(typeof context.previousClientId === "string" ? context.previousClientId : null)}`,
+      ];
     case "listener.stopped":
-      return `Oyente ${clientId} dejó de escuchar ${lang ?? "?"}${listenersSuffix}`;
+      return [
+        `Oyente ${clientId} dejó de escuchar ${lang ?? "?"}`,
+        listenersLine,
+      ].filter(Boolean);
     case "ws.client.disconnected": {
       const role =
         context.role === "broadcaster"
@@ -144,11 +172,25 @@ export function formatHumanLogMessage(event, context = {}) {
           : context.role === "listener"
             ? "Oyente"
             : "Cliente";
-      const duration = connected ? `, conectado ${connected}` : "";
-      const idleText = idle ? `, inactivo ${idle}` : "";
-      const intentional =
-        context.intentionalStop === true ? " (parada voluntaria)" : "";
-      return `${role} ${clientId}${lang ? ` (${lang})` : ""} desconectado: ${closeHuman ?? "motivo desconocido"}${intentional}${duration}${idleText}${listenersSuffix}`;
+      const closeHuman =
+        typeof context.closeKind === "string"
+          ? describeCloseKindHuman(context.closeKind)
+          : "motivo desconocido";
+      const connected = formatDurationMs(
+        typeof context.connectedDurationMs === "number"
+          ? context.connectedDurationMs
+          : null
+      );
+      const idle = formatDurationMs(
+        typeof context.idleMs === "number" ? context.idleMs : null
+      );
+      return [
+        `${role} desconectado · ${clientId}${lang ? ` · idioma ${lang}` : ""}`,
+        `Motivo: ${closeHuman}`,
+        connected ? `Tiempo conectado: ${connected}` : "",
+        idle ? `Sin señal al servidor: ${idle}` : "",
+        listenersLine,
+      ].filter(Boolean);
     }
     case "ws.client.stale_closed": {
       const thresholdSec = Math.round(
@@ -156,53 +198,44 @@ export function formatHumanLogMessage(event, context = {}) {
           ? context.staleThresholdMs
           : 300000) / 1000
       );
-      return `Conexión fantasma cerrada: oyente ${clientId}${lang ? ` (${lang})` : ""} sin actividad durante ${idle ?? "?"} (límite ${thresholdSec} s)${listenersSuffix}`;
+      const idle = formatDurationMs(
+        typeof context.idleMs === "number" ? context.idleMs : null
+      );
+      return [
+        `Conexión fantasma cerrada · oyente ${clientId}${lang ? ` (${lang})` : ""}`,
+        idle
+          ? `Sin actividad ${idle} (límite ${thresholdSec} s)`
+          : `Límite de inactividad: ${thresholdSec} s`,
+        listenersLine,
+      ].filter(Boolean);
     }
     case "ws.client.duplicate_replaced":
-      return `Reconexión del mismo dispositivo ${clientId}${lang ? ` (${lang})` : ""}: se cerró el socket antiguo`;
+      return [
+        `Mismo dispositivo reconectado · ${clientId}${lang ? ` (${lang})` : ""}`,
+        "Se cerró el socket antiguo (normal al volver a primer plano)",
+      ];
     case "ws.client.language_restored":
-      return `Sesión restaurada para ${clientId}: sigue escuchando ${context.language ?? lang ?? "?"}`;
-    case "ws.client.connected":
-      return `Nuevo cliente conectado (${clientId}). Total conexiones WS: ${context.totalConnections ?? "?"}`;
-    case "ws.client.identified":
-      return `Cliente identificado como ${clientId}${context.restoredLanguage ? `, idioma restaurado ${context.restoredLanguage}` : ""}`;
-    case "ws.client.duplicate_closed":
-      return `Socket duplicado cerrado para ${clientId}`;
-    case "ws.message.received":
-      return `Mensaje recibido de ${clientId}: ${context.messageType ?? "?"}`;
-    case "ws.message.parse_failed":
-      return `Mensaje JSON inválido de ${clientId}`;
+      return [
+        `Sesión restaurada · ${clientId}`,
+        `Sigue escuchando ${context.language ?? lang ?? "?"}`,
+        listenersLine,
+      ].filter(Boolean);
     case "signaling.offer.no_broadcaster":
-      return `Oyente ${clientId} pidió audio en ${lang ?? "?"} pero no hay emisor activo`;
-    case "signaling.offer.requested":
-      return `Oyente ${clientId} (${lang ?? "?"}) solicitó oferta WebRTC al emisor`;
-    case "signaling.peer.pruned":
-      return `Emisor avisado para cerrar peer del oyente ${shortenClientId(typeof context.listenerId === "string" ? context.listenerId : null)} (${context.reason ?? "desconocido"})`;
-    case "signaling.peer.prune_skipped":
-      return `No se pudo avisar al emisor para cerrar peer de ${shortenClientId(typeof context.listenerId === "string" ? context.listenerId : null)}: sin emisor disponible`;
-    case "signaling.peer.prune_failed":
-      return `Fallo avisando al emisor para cerrar peer de ${shortenClientId(typeof context.listenerId === "string" ? context.listenerId : null)}: ${context.errorMessage ?? "error desconocido"}`;
-    case "signaling.relay.language_mismatch":
-      return `Señal WebRTC ignorada por idioma incompatible (${context.messageType ?? "?"}) entre ${shortenClientId(typeof context.fromClientId === "string" ? context.fromClientId : null)} y ${shortenClientId(typeof context.targetId === "string" ? context.targetId : null)}`;
-    case "signaling.relay.forwarded":
-      return `Señal WebRTC ${context.messageType ?? "?"} reenviada de ${shortenClientId(typeof context.fromClientId === "string" ? context.fromClientId : null)} a ${shortenClientId(typeof context.targetId === "string" ? context.targetId : null)}`;
-    case "signaling.relay.buffered":
-      return `Señal WebRTC ${context.messageType ?? "?"} en cola para ${shortenClientId(typeof context.targetId === "string" ? context.targetId : null)} (destino temporalmente no listo)`;
-    case "signaling.relay.dropped":
-      return `Señal WebRTC ${context.messageType ?? "?"} descartada: destino ${shortenClientId(typeof context.targetId === "string" ? context.targetId : null)} no existe`;
-    case "signaling.message.buffered":
-      return `Mensaje ${context.messageType ?? "?"} en cola para ${shortenClientId(typeof context.targetId === "string" ? context.targetId : null)} (${context.queueSize ?? "?"} en cola)`;
-    case "signaling.message.flushed":
-      return `Cola de mensajes entregada a ${clientId} (${context.messageCount ?? "?"} mensajes)`;
-    case "auth.broadcaster_rejected":
-      return `Intento de emisión rechazado en ${lang ?? "?"}: token inválido o expirado`;
-    case "ws.server.error":
-      return `Error del servidor WebSocket: ${context.errorMessage ?? "desconocido"}`;
-    case "ws.ping.failed":
-      return `No se pudo enviar ping al cliente ${clientId}: ${context.errorMessage ?? "error desconocido"}`;
+      return [
+        `Oyente ${clientId} pidió audio en ${lang ?? "?"}`,
+        "No hay emisor activo en ese idioma",
+      ];
     default:
-      return `Evento ${event}`;
+      return [`Evento técnico: ${event}`];
   }
+}
+
+/**
+ * @param {string} event
+ * @param {Record<string, unknown>} context
+ */
+export function formatHumanLogMessage(event, context = {}) {
+  return formatHumanLogHeadline(event, context).join(" · ");
 }
 
 /**
@@ -226,8 +259,10 @@ export function formatLogLevelLabel(level) {
  */
 export function formatHumanLogLine(level, event, context = {}) {
   const ts = new Date().toISOString();
-  const message = formatHumanLogMessage(event, context);
-  return `${ts} [${formatLogLevelLabel(level)}] ${message} · ${event}`;
+  const emoji = eventEmoji(level, event);
+  const headline = formatHumanLogHeadline(event, context);
+  const body = headline.map((line) => `  ${line}`).join("\n");
+  return `${ts} [${formatLogLevelLabel(level)}] ${emoji} ${event}\n${body}`;
 }
 
 /**

@@ -14,3 +14,5 @@ services:
         value: production
       - key: WS_STALE_AFTER_MS
         value: "300000"
+      - key: LISTENER_BACKGROUND_GRACE_MS
+        value: "1800000"

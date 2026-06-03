@@ -9,6 +9,11 @@ import cors from "cors";
 import admin from "firebase-admin";
 
 import { createDebouncedCallback } from "./listenerCountScheduler.js";
+import {
+  buildListenerCountPayload,
+  computeListenerCounts,
+  parseListenerBackgroundGraceMs,
+} from "./listenerCount.js";
 import { createClientSessionStore } from "./clientSessions.js";
 import { applyClientIdentify } from "./identifyClient.js";
 import { canRelaySignaling } from "./signalingRelay.js";
@@ -42,7 +47,6 @@ import {
   describeCloseCode,
   errorFields,
   isVerboseLoggingEnabled,
-  snapshotListenerCounts,
 } from "./signalingLogger.js";
 
 dotenv.config();
@@ -193,6 +197,9 @@ const WS_STALE_AFTER_MS = parseStaleAfterMs(
   process.env.WS_STALE_AFTER_MS,
   300000
 );
+const LISTENER_BACKGROUND_GRACE_MS = parseListenerBackgroundGraceMs(
+  process.env.LISTENER_BACKGROUND_GRACE_MS
+);
 
 // =====================================================
 // 🌐 WebSocket Server
@@ -202,6 +209,7 @@ const server = app.listen(PORT, () => {
     port: PORT,
     wsStaleAfterMs: WS_STALE_AFTER_MS,
     wsStaleCheckMs: WS_STALE_CHECK_MS,
+    listenerBackgroundGraceMs: LISTENER_BACKGROUND_GRACE_MS,
     verboseLogging: signalingLog.verboseEnabled,
   });
 });
@@ -215,6 +223,20 @@ wss.on("error", (err) => {
 const broadcasters = {}; // { es: ws, en: ws, ro: ws }
 const activeBroadcasts = { es: false, en: false, ro: false };
 const clientSessions = createClientSessionStore();
+
+function snapshotListenersForLog() {
+  return computeListenerCounts(
+    wss.clients,
+    clientSessions,
+    LISTENER_BACKGROUND_GRACE_MS
+  );
+}
+
+function touchListenerSession(ws) {
+  if (ws.id && ws.language && !ws.isBroadcaster) {
+    clientSessions.touchListener(ws.id);
+  }
+}
 
 app.get("/health", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -261,8 +283,11 @@ const heartbeatInterval = setInterval(() => {
         signalingLog.warn("ws.client.stale_closed", {
           ...buildClientLogContext(client),
           staleThresholdMs: WS_STALE_AFTER_MS,
-          listeners: snapshotListenerCounts(wss.clients),
+          listeners: snapshotListenersForLog(),
         });
+        if (client.id && client.language) {
+          clientSessions.clearListenerLanguage(client.id);
+        }
         try {
           client.close(4001, "stale_connection");
         } catch {
@@ -376,12 +401,12 @@ function broadcastToAll(message) {
 
 // 🔹 Función para actualizar conteo de oyentes por idioma
 function updateListenerCounts() {
-  const counts = { es: 0, en: 0, ro: 0 };
-  wss.clients.forEach((client) => {
-    if (!client.isBroadcaster && client.language) {
-      counts[client.language] = (counts[client.language] || 0) + 1;
-    }
-  });
+  clientSessions.purgeExpiredSessions(LISTENER_BACKGROUND_GRACE_MS);
+  const counts = buildListenerCountPayload(
+    wss.clients,
+    clientSessions,
+    LISTENER_BACKGROUND_GRACE_MS
+  );
   broadcastToAll({ type: "listeners-count", listeners: counts });
 }
 
@@ -433,6 +458,7 @@ function handleWsIdentify(ws, data) {
     });
   }
   if (restoredLanguage) {
+    clientSessions.touchListener(ws.id);
     signalingLog.info("ws.client.language_restored", {
       clientId: ws.id,
       language: restoredLanguage,
@@ -498,7 +524,7 @@ function handleWsBroadcasterRegister(ws, data) {
   signalingLog.info("broadcaster.registered", {
     language: data.language,
     clientId: ws.id,
-    listeners: snapshotListenerCounts(wss.clients),
+    listeners: snapshotListenersForLog(),
   });
   recordBroadcasterRegistration(data.language, ws.id);
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
@@ -511,7 +537,7 @@ function handleWsStopBroadcast(data) {
   activeBroadcasts[data.language] = false;
   signalingLog.info("broadcaster.stopped", {
     language: data.language,
-    listeners: snapshotListenerCounts(wss.clients),
+    listeners: snapshotListenersForLog(),
   });
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
   return true;
@@ -564,7 +590,7 @@ function handleWsStopListening(ws, data) {
   signalingLog.info("listener.stopped", {
     clientId: ws.id,
     language: data.language,
-    listeners: snapshotListenerCounts(wss.clients),
+    listeners: snapshotListenersForLog(),
   });
 
   const bc = broadcasters[data.language];
@@ -642,6 +668,7 @@ wss.on("connection", (ws) => {
   touchClientActivity(ws);
   ws.on("pong", () => {
     touchClientActivity(ws);
+    touchListenerSession(ws);
   });
 
   signalingLog.verbose("ws.client.connected", {
@@ -672,7 +699,10 @@ wss.on("connection", (ws) => {
     });
 
     if (handleWsIdentify(ws, data)) return;
-    if (handleWsClientPing(data)) return;
+    if (handleWsClientPing(data)) {
+      touchListenerSession(ws);
+      return;
+    }
     if (handleWsBroadcasterRegister(ws, data)) return;
     if (handleWsStopBroadcast(data)) return;
     if (handleWsRequestOffer(ws, data)) return;
@@ -684,7 +714,7 @@ wss.on("connection", (ws) => {
   ws.on("close", (code, reason) => {
     const closeReasonText = reason?.toString?.() ?? "";
     const closeKind = describeCloseCode(code);
-    const listeners = snapshotListenerCounts(wss.clients);
+    const listeners = snapshotListenersForLog();
 
     if (!ws.isBroadcaster && ws.language) {
       if (shouldNotifyBroadcasterOnListenerClose(code)) {
@@ -711,6 +741,9 @@ wss.on("connection", (ws) => {
         signalingLog.warn("ws.client.disconnected", disconnectPayload);
       }
 
+      if (code === 1000) {
+        clearListenerSession(ws, clientSessions);
+      }
       ws.language = null;
       if (shouldUpdateListenerCountOnClose(wss.clients, ws, code)) {
         listenerCountNotifier.schedule();

@@ -64,7 +64,7 @@ test("logSignalingEvent emits human-readable line by default", () => {
       verboseEnabled: false,
     });
     assert.match(output, /Firebase conectado correctamente/);
-    assert.match(output, /server\.firebase\.connected$/);
+    assert.match(output, /server\.firebase\.connected/);
   } finally {
     console.log = original;
   }

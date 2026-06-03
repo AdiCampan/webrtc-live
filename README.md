@@ -112,6 +112,7 @@ El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va ent
 | `SIGNALING_LOG_FORMAT` | `human` (por defecto), `json` (línea JSON antigua) o `both` (las dos). |
 | `LISTENER_COUNT_DEBOUNCE_MS` | Ms entre refrescos agrupados del conteo (por defecto 500). |
 | `WS_STALE_AFTER_MS` | Ms sin actividad del cliente antes de cerrar un WS de oyente/broadcaster (por defecto 300000, mínimo 30000). |
+| `LISTENER_BACKGROUND_GRACE_MS` | Ms durante los que un oyente sigue contando en el panel aunque el WebSocket se haya cortado (p. ej. Android en segundo plano con audio activo; por defecto 1800000). |
 
 ---
 

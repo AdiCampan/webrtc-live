@@ -47,7 +47,7 @@ test("formatHumanLogMessage covers key production events", () => {
       language: "es",
       listeners: { totalListeners: 0, byLanguage: { es: 0, en: 0, ro: 0 } },
     }),
-    /Emisión iniciada en es/
+    /Emisión EN VIVO en es/
   );
 
   assert.match(
@@ -61,7 +61,7 @@ test("formatHumanLogMessage covers key production events", () => {
       connectedDurationMs: 1_748_506,
       listeners: { totalListeners: 4, byLanguage: { es: 4, en: 0, ro: 0 } },
     }),
-    /Oyente dd1c5cb4… \(es\) desconectado: conexión cortada sin aviso/
+    /señal WebSocket cortada/
   );
   assert.match(
     formatHumanLogMessage("ws.client.disconnected", {
@@ -74,7 +74,7 @@ test("formatHumanLogMessage covers key production events", () => {
       connectedDurationMs: 1_748_506,
       listeners: { totalListeners: 4, byLanguage: { es: 4, en: 0, ro: 0 } },
     }),
-    /Quedan 4 oyentes/
+    /Conteo oyentes: 4 oyentes/
   );
 
   assert.match(
@@ -93,7 +93,7 @@ test("formatHumanLogMessage covers key production events", () => {
       signal: "SIGTERM",
       connectedClients: 0,
     }),
-    /Reinicio o deploy en curso/
+    /Reinicio o deploy/
   );
 
   assert.match(
@@ -101,22 +101,22 @@ test("formatHumanLogMessage covers key production events", () => {
       language: "es",
       listenerId: "38fe1719-1268-4502-9128-8cc47e951a7b",
     }),
-    /no hay emisor activo/
+    /No hay emisor activo/
   );
 });
 
 test("describeCloseKindHuman maps close kinds to Spanish", () => {
   assert.equal(
     describeCloseKindHuman("abnormal_no_close_frame"),
-    "conexión cortada sin aviso (red o segundo plano)"
+    "señal WebSocket cortada (móvil en segundo plano, red o ahorro de batería)"
   );
   assert.equal(
     describeCloseKindHuman("replaced_by_reconnect"),
-    "reconexión del mismo dispositivo"
+    "mismo dispositivo reconectado (socket antiguo)"
   );
 });
 
-test("formatHumanLogLine includes level label and event slug", () => {
+test("formatHumanLogLine uses multiline human layout", () => {
   const line = formatHumanLogLine("warn", "broadcaster.disconnected", {
     language: "es",
     closeKind: "going_away",
@@ -124,8 +124,9 @@ test("formatHumanLogLine includes level label and event slug", () => {
     listeners: { totalListeners: 2, byLanguage: { es: 2, en: 0, ro: 0 } },
   });
   assert.match(line, /\[AVISO\]/);
+  assert.match(line, /broadcaster\.disconnected/);
   assert.match(line, /Emisor es desconectado/);
-  assert.match(line, /broadcaster\.disconnected$/);
+  assert.match(line, /Conteo oyentes: 2 oyentes/);
 });
 
 test("resolveLogOutputFormat defaults to human", () => {

@@ -13,6 +13,22 @@ test("createClientSessionStore persists and clears listener language", () => {
   assert.equal(store.getListenerLanguage("client-a"), null);
 });
 
+test("createClientSessionStore touch and purge expired sessions", () => {
+  const store = createClientSessionStore();
+  store.setListenerLanguage("client-b", "en");
+  const before = Date.now();
+  store.touchListener("client-b");
+  let lastSeen = 0;
+  store.forEachActiveListenerSession((id, session) => {
+    if (id === "client-b") {
+      lastSeen = session.lastSeenAt;
+    }
+  });
+  assert.ok(lastSeen >= before);
+  store.purgeExpiredSessions(-1);
+  assert.equal(store.getListenerLanguage("client-b"), null);
+});
+
 test("applyClientIdentify closes duplicate socket and restores language", () => {
   const store = createClientSessionStore();
   store.setListenerLanguage("listener-1", "es");
