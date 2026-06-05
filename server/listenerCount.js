@@ -1,15 +1,23 @@
 const WS_OPEN = 1;
+const LISTENER_BACKGROUND_GRACE_MIN_MS = 60_000;
+const LISTENER_BACKGROUND_GRACE_MAX_MS = 10_800_000;
 
 /**
  * @param {string | undefined} raw
  * @param {number} fallbackMs
  */
-export function parseListenerBackgroundGraceMs(raw, fallbackMs = 1_800_000) {
+export function parseListenerBackgroundGraceMs(
+  raw,
+  fallbackMs = LISTENER_BACKGROUND_GRACE_MAX_MS
+) {
   const n = Number.parseInt(raw ?? "", 10);
   if (!Number.isFinite(n)) {
     return fallbackMs;
   }
-  return Math.min(Math.max(n, 60_000), 7_200_000);
+  return Math.min(
+    Math.max(n, LISTENER_BACKGROUND_GRACE_MIN_MS),
+    LISTENER_BACKGROUND_GRACE_MAX_MS
+  );
 }
 
 /**

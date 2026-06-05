@@ -118,7 +118,7 @@ export function formatHumanLogHeadline(event, context = {}) {
       const graceSec = Math.round(
         (typeof context.listenerBackgroundGraceMs === "number"
           ? context.listenerBackgroundGraceMs
-          : 1_800_000) / 1000
+          : 10_800_000) / 1000
       );
       return [
         `Servidor listo en puerto ${port}`,

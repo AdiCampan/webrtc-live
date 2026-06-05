@@ -9,9 +9,11 @@ import {
 import { createClientSessionStore } from "./clientSessions.js";
 
 test("parseListenerBackgroundGraceMs clamps and defaults", () => {
-  assert.equal(parseListenerBackgroundGraceMs(undefined), 1_800_000);
+  assert.equal(parseListenerBackgroundGraceMs(undefined), 10_800_000);
   assert.equal(parseListenerBackgroundGraceMs("120000"), 120_000);
   assert.equal(parseListenerBackgroundGraceMs("1000"), 60_000);
+  assert.equal(parseListenerBackgroundGraceMs("10800000"), 10_800_000);
+  assert.equal(parseListenerBackgroundGraceMs("99999999"), 10_800_000);
 });
 
 test("computeListenerCounts includes grace sessions without open socket", () => {

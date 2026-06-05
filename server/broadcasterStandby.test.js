@@ -76,6 +76,8 @@ test("parseStaleAfterMs clamps and falls back", () => {
   assert.strictEqual(parseStaleAfterMs(undefined, 90000), 90000);
   assert.strictEqual(parseStaleAfterMs("120000", 90000), 120000);
   assert.strictEqual(parseStaleAfterMs("10000", 90000), 30000);
-  assert.strictEqual(parseStaleAfterMs("999999", 90000), 600000);
+  assert.strictEqual(parseStaleAfterMs("900000", 90000), 900000);
+  assert.strictEqual(parseStaleAfterMs("10800000", 90000), 10800000);
+  assert.strictEqual(parseStaleAfterMs("99999999", 90000), 10800000);
   assert.strictEqual(parseStaleAfterMs("not-a-number", 90000), 90000);
 });

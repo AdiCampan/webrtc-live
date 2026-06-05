@@ -1,4 +1,6 @@
 const WS_OPEN = 1;
+const WS_STALE_AFTER_MIN_MS = 30_000;
+const WS_STALE_AFTER_MAX_MS = 10_800_000;
 
 /**
  * Picks another connected socket that is still marked as broadcaster for the same language
@@ -31,5 +33,5 @@ export function findStandbyBroadcaster(clients, language, excludeId) {
 export function parseStaleAfterMs(raw, fallback) {
   const n = Number.parseInt(raw ?? "", 10);
   if (!Number.isFinite(n)) return fallback;
-  return Math.min(Math.max(n, 30000), 600000);
+  return Math.min(Math.max(n, WS_STALE_AFTER_MIN_MS), WS_STALE_AFTER_MAX_MS);
 }
