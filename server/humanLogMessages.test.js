@@ -208,6 +208,7 @@ test("formatHumanLogLine marks 4002 reconnect replacement disconnect as OK", () 
     language: "es",
     closeCode: 4002,
     closeKind: "replaced_by_reconnect",
+    intentionalStop: true,
     connectedDurationMs: 3_380_000,
     idleMs: 6000,
     listeners: { totalListeners: 3, byLanguage: { es: 3, en: 0, ro: 0 } },

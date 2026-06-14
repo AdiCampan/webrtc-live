@@ -1,5 +1,11 @@
 import { describeCloseCode } from "./wsCloseCodes.js";
 
+const MADRID_RECORDED_AT_FORMATTER = new Intl.DateTimeFormat("es-ES", {
+  timeZone: "Europe/Madrid",
+  dateStyle: "short",
+  timeStyle: "medium",
+});
+
 /**
  * @param {number | null | undefined} ms
  */
@@ -589,11 +595,7 @@ export function formatServerRecordedAtFooter(isoTs) {
   if (Number.isNaN(date.getTime())) {
     return `Registrado servidor: ${isoTs}`;
   }
-  const madrid = new Intl.DateTimeFormat("es-ES", {
-    timeZone: "Europe/Madrid",
-    dateStyle: "short",
-    timeStyle: "medium",
-  }).format(date);
+  const madrid = MADRID_RECORDED_AT_FORMATTER.format(date);
   return `Registrado servidor: ${madrid} (Madrid) · ${isoTs} (UTC)`;
 }
 

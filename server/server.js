@@ -737,7 +737,7 @@ wss.on("connection", (ws) => {
         closeCode: code,
         closeKind,
         closeReason: closeReasonText || null,
-        intentionalStop: code === 1000,
+        intentionalStop: code === 1000 || code === 4002,
         listeners,
       };
 
