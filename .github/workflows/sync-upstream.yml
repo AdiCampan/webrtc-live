@@ -1,0 +1,36 @@
+name: Sync to upstream
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to upstream repository
+        env:
+          UPSTREAM_TOKEN: ${{ secrets.UPSTREAM_REPO_TOKEN }}
+          UPSTREAM_REPO: AdiCampan/webrtc-live
+          UPSTREAM_BRANCH: main
+        run: |
+          set -euo pipefail
+
+          if [ -z "${UPSTREAM_TOKEN}" ]; then
+            echo "UPSTREAM_REPO_TOKEN secret is not configured."
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream "https://x-access-token:${UPSTREAM_TOKEN}@github.com/${UPSTREAM_REPO}.git"
+          git push upstream "HEAD:refs/heads/${UPSTREAM_BRANCH}"
