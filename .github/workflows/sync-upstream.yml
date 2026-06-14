@@ -30,8 +30,12 @@ jobs:
             exit 1
           fi
 
+          git config --local credential.helper ""
+          unset GITHUB_TOKEN
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git remote add upstream "https://x-access-token:${UPSTREAM_TOKEN}@github.com/${UPSTREAM_REPO}.git"
-          git push upstream "HEAD:refs/heads/${UPSTREAM_BRANCH}"
+          git push \
+            "https://oauth2:${UPSTREAM_TOKEN}@github.com/${UPSTREAM_REPO}.git" \
+            "HEAD:refs/heads/${UPSTREAM_BRANCH}"
