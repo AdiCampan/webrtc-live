@@ -453,7 +453,7 @@ function handleWsIdentify(ws, data) {
     restoredLanguage: restoredLanguage ?? null,
   });
   if (replacedDuplicate) {
-    signalingLog.warn("ws.client.duplicate_replaced", {
+    signalingLog.info("ws.client.duplicate_replaced", {
       clientId: ws.id,
       restoredLanguage: restoredLanguage ?? null,
     });
@@ -743,7 +743,7 @@ wss.on("connection", (ws) => {
 
       if (code === 4001) {
         signalingLog.verbose("ws.client.disconnected", disconnectPayload);
-      } else if (code === 1000) {
+      } else if (code === 1000 || code === 4002) {
         signalingLog.info("ws.client.disconnected", disconnectPayload);
       } else {
         signalingLog.warn("ws.client.disconnected", disconnectPayload);

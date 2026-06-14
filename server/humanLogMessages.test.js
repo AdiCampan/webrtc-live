@@ -201,6 +201,35 @@ test("formatHumanLogLine marks intentional listener disconnect as OK", () => {
   assert.doesNotMatch(line, /Por qué está mal/);
 });
 
+test("formatHumanLogLine marks 4002 reconnect replacement disconnect as OK", () => {
+  const line = formatHumanLogLine("info", "ws.client.disconnected", {
+    clientId: "dd1c5cb4-long-id",
+    role: "listener",
+    language: "es",
+    closeCode: 4002,
+    closeKind: "replaced_by_reconnect",
+    connectedDurationMs: 3_380_000,
+    idleMs: 6000,
+    listeners: { totalListeners: 3, byLanguage: { es: 3, en: 0, ro: 0 } },
+  });
+  assert.match(line, /\[INFO\]/);
+  assert.match(line, /código WS 4002/);
+  assert.match(line, /mismo dispositivo reconectado/i);
+  assert.match(line, /\n  OK\n  Registrado servidor:/);
+  assert.doesNotMatch(line, /Por qué está mal/);
+});
+
+test("formatHumanLogLine marks duplicate_replaced as OK without diagnosis noise", () => {
+  const line = formatHumanLogLine("info", "ws.client.duplicate_replaced", {
+    clientId: "dd1c5cb4-long-id",
+    restoredLanguage: "es",
+  });
+  assert.match(line, /ws\.client\.duplicate_replaced/);
+  assert.match(line, /Mismo dispositivo reconectado/);
+  assert.match(line, /\n  OK\n  Registrado servidor:/);
+  assert.doesNotMatch(line, /Acción:/);
+});
+
 test("resolveLogOutputFormat defaults to human", () => {
   assert.equal(resolveLogOutputFormat(undefined), "human");
   assert.equal(resolveLogOutputFormat("json"), "json");
