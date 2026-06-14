@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   describeCloseKindHuman,
   formatDurationMs,
+  formatHumanLogDiagnosis,
   formatHumanLogLine,
   formatHumanLogMessage,
   formatListenerSummary,
@@ -45,9 +46,20 @@ test("formatHumanLogMessage covers key production events", () => {
   assert.match(
     formatHumanLogMessage("broadcaster.registered", {
       language: "es",
+      clientId: "emisor-abc-123",
       listeners: { totalListeners: 0, byLanguage: { es: 0, en: 0, ro: 0 } },
+      activeBroadcasts: { es: true, en: false, ro: false },
     }),
     /Emisión EN VIVO en es/
+  );
+  assert.match(
+    formatHumanLogMessage("broadcaster.registered", {
+      language: "es",
+      clientId: "emisor-abc-123",
+      listeners: { totalListeners: 0, byLanguage: { es: 0, en: 0, ro: 0 } },
+      activeBroadcasts: { es: true, en: false, ro: false },
+    }),
+    /Emisor: emisor-a/
   );
 
   assert.match(
@@ -100,6 +112,7 @@ test("formatHumanLogMessage covers key production events", () => {
     formatHumanLogMessage("signaling.offer.no_broadcaster", {
       language: "es",
       listenerId: "38fe1719-1268-4502-9128-8cc47e951a7b",
+      activeBroadcasts: { es: false, en: false, ro: false },
     }),
     /No hay emisor activo/
   );
@@ -116,17 +129,66 @@ test("describeCloseKindHuman maps close kinds to Spanish", () => {
   );
 });
 
-test("formatHumanLogLine uses multiline human layout", () => {
+test("formatHumanLogLine appends OK for healthy info events", () => {
+  const line = formatHumanLogLine("info", "broadcaster.registered", {
+    language: "es",
+    clientId: "abc12345-long-id",
+    listeners: { totalListeners: 3, byLanguage: { es: 3, en: 0, ro: 0 } },
+    activeBroadcasts: { es: true, en: false, ro: false },
+  });
+  assert.match(line, /\[INFO\]/);
+  assert.match(line, /broadcaster\.registered/);
+  assert.match(line, /Emisión EN VIVO en es/);
+  assert.match(line, /Conteo oyentes: 3 oyentes/);
+  assert.match(line, /\n  OK$/);
+});
+
+test("formatHumanLogLine includes diagnosis for broadcaster disconnect without replacement", () => {
   const line = formatHumanLogLine("warn", "broadcaster.disconnected", {
     language: "es",
-    closeKind: "going_away",
+    clientId: "emisor-xyz",
+    closeCode: 1006,
+    closeKind: "abnormal_no_close_frame",
     replacementClientId: null,
-    listeners: { totalListeners: 2, byLanguage: { es: 2, en: 0, ro: 0 } },
+    connectedDurationMs: 2_700_000,
+    listeners: { totalListeners: 12, byLanguage: { es: 12, en: 0, ro: 0 } },
+    activeBroadcasts: { es: false, en: false, ro: false },
   });
   assert.match(line, /\[AVISO\]/);
-  assert.match(line, /broadcaster\.disconnected/);
-  assert.match(line, /Emisor es desconectado/);
-  assert.match(line, /Conteo oyentes: 2 oyentes/);
+  assert.match(line, /No queda otra sesión de emisión/);
+  assert.match(line, /Por qué está mal: no hay emisor activo/i);
+  assert.match(line, /Acción:/);
+  assert.match(line, /Código a revisar:.*server\/server\.js/);
+  assert.match(line, /Posibles fallos en código:/);
+  assert.match(line, /findStandbyBroadcaster/);
+  assert.doesNotMatch(line, /\n  OK$/);
+});
+
+test("formatHumanLogLine includes fix guidance for firestore errors", () => {
+  const diagnosis = formatHumanLogDiagnosis("error", "server.firestore.read_failed", {
+    errorMessage: "permission denied",
+    collection: "events",
+    doc: "next-event",
+  });
+  assert.equal(diagnosis.isOk, false);
+  assert.match(diagnosis.lines.join(" "), /FIREBASE_SERVICE_ACCOUNT/);
+  assert.match(diagnosis.lines.join(" "), /Código a revisar:/);
+  assert.match(diagnosis.lines.join(" "), /Posibles fallos en código:/);
+  assert.match(diagnosis.lines.join(" "), /server\/server\.js/);
+});
+
+test("formatHumanLogLine marks intentional listener disconnect as OK", () => {
+  const line = formatHumanLogLine("info", "ws.client.disconnected", {
+    clientId: "listener-1",
+    role: "listener",
+    language: "es",
+    closeCode: 1000,
+    closeKind: "normal_closure",
+    intentionalStop: true,
+    listeners: { totalListeners: 1, byLanguage: { es: 1, en: 0, ro: 0 } },
+  });
+  assert.match(line, /\n  OK$/);
+  assert.doesNotMatch(line, /Por qué está mal/);
 });
 
 test("resolveLogOutputFormat defaults to human", () => {

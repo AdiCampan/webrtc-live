@@ -525,6 +525,7 @@ function handleWsBroadcasterRegister(ws, data) {
     language: data.language,
     clientId: ws.id,
     listeners: snapshotListenersForLog(),
+    activeBroadcasts: { ...activeBroadcasts },
   });
   recordBroadcasterRegistration(data.language, ws.id);
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
@@ -538,6 +539,7 @@ function handleWsStopBroadcast(data) {
   signalingLog.info("broadcaster.stopped", {
     language: data.language,
     listeners: snapshotListenersForLog(),
+    activeBroadcasts: { ...activeBroadcasts },
   });
   broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
   return true;
@@ -770,6 +772,7 @@ wss.on("connection", (ws) => {
           broadcasters[lang] = replacement;
           activeBroadcasts[lang] = true;
           signalingLog.warn("broadcaster.disconnected", {
+            ...buildClientLogContext(ws),
             language: lang,
             clientId: ws.id,
             closeCode: code,
@@ -777,9 +780,11 @@ wss.on("connection", (ws) => {
             closeReason: closeReasonText || null,
             replacementClientId: replacement.id,
             listeners,
+            activeBroadcasts: { ...activeBroadcasts },
           });
         } else {
           signalingLog.warn("broadcaster.disconnected", {
+            ...buildClientLogContext(ws),
             language: lang,
             clientId: ws.id,
             closeCode: code,
@@ -787,6 +792,7 @@ wss.on("connection", (ws) => {
             closeReason: closeReasonText || null,
             replacementClientId: null,
             listeners,
+            activeBroadcasts: { ...activeBroadcasts },
           });
         }
         broadcastToAll({ type: "active-broadcasts", active: activeBroadcasts });
