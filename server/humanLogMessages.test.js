@@ -8,6 +8,7 @@ import {
   formatHumanLogLine,
   formatHumanLogMessage,
   formatListenerSummary,
+  formatServerRecordedAtFooter,
   resolveLogOutputFormat,
   shortenClientId,
 } from "./humanLogMessages.js";
@@ -129,6 +130,13 @@ test("describeCloseKindHuman maps close kinds to Spanish", () => {
   );
 });
 
+test("formatServerRecordedAtFooter renders Madrid and UTC from the same instant", () => {
+  const footer = formatServerRecordedAtFooter("2026-06-14T16:46:34.066Z");
+  assert.match(footer, /Registrado servidor:/);
+  assert.match(footer, /Madrid/);
+  assert.match(footer, /2026-06-14T16:46:34\.066Z \(UTC\)/);
+});
+
 test("formatHumanLogLine appends OK for healthy info events", () => {
   const line = formatHumanLogLine("info", "broadcaster.registered", {
     language: "es",
@@ -140,7 +148,8 @@ test("formatHumanLogLine appends OK for healthy info events", () => {
   assert.match(line, /broadcaster\.registered/);
   assert.match(line, /Emisión EN VIVO en es/);
   assert.match(line, /Conteo oyentes: 3 oyentes/);
-  assert.match(line, /\n  OK$/);
+  assert.match(line, /\n  OK\n  Registrado servidor:/);
+  assert.match(line, /\(UTC\)$/);
 });
 
 test("formatHumanLogLine includes diagnosis for broadcaster disconnect without replacement", () => {
@@ -161,7 +170,8 @@ test("formatHumanLogLine includes diagnosis for broadcaster disconnect without r
   assert.match(line, /Código a revisar:.*server\/server\.js/);
   assert.match(line, /Posibles fallos en código:/);
   assert.match(line, /findStandbyBroadcaster/);
-  assert.doesNotMatch(line, /\n  OK$/);
+  assert.doesNotMatch(line, /\n  OK\n/);
+  assert.match(line, /Registrado servidor:.*\(UTC\)$/);
 });
 
 test("formatHumanLogLine includes fix guidance for firestore errors", () => {
@@ -187,8 +197,38 @@ test("formatHumanLogLine marks intentional listener disconnect as OK", () => {
     intentionalStop: true,
     listeners: { totalListeners: 1, byLanguage: { es: 1, en: 0, ro: 0 } },
   });
-  assert.match(line, /\n  OK$/);
+  assert.match(line, /\n  OK\n  Registrado servidor:/);
   assert.doesNotMatch(line, /Por qué está mal/);
+});
+
+test("formatHumanLogLine marks 4002 reconnect replacement disconnect as OK", () => {
+  const line = formatHumanLogLine("info", "ws.client.disconnected", {
+    clientId: "dd1c5cb4-long-id",
+    role: "listener",
+    language: "es",
+    closeCode: 4002,
+    closeKind: "replaced_by_reconnect",
+    intentionalStop: true,
+    connectedDurationMs: 3_380_000,
+    idleMs: 6000,
+    listeners: { totalListeners: 3, byLanguage: { es: 3, en: 0, ro: 0 } },
+  });
+  assert.match(line, /\[INFO\]/);
+  assert.match(line, /código WS 4002/);
+  assert.match(line, /mismo dispositivo reconectado/i);
+  assert.match(line, /\n  OK\n  Registrado servidor:/);
+  assert.doesNotMatch(line, /Por qué está mal/);
+});
+
+test("formatHumanLogLine marks duplicate_replaced as OK without diagnosis noise", () => {
+  const line = formatHumanLogLine("info", "ws.client.duplicate_replaced", {
+    clientId: "dd1c5cb4-long-id",
+    restoredLanguage: "es",
+  });
+  assert.match(line, /ws\.client\.duplicate_replaced/);
+  assert.match(line, /Mismo dispositivo reconectado/);
+  assert.match(line, /\n  OK\n  Registrado servidor:/);
+  assert.doesNotMatch(line, /Acción:/);
 });
 
 test("resolveLogOutputFormat defaults to human", () => {

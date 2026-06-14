@@ -35,6 +35,7 @@ import {
   findStandbyBroadcaster,
   parseStaleAfterMs,
 } from "./broadcasterStandby.js";
+import { isDuplicateBroadcasterRegistration } from "./broadcasterRegister.js";
 import {
   buildSignalingMetricsPayload,
   recordBroadcasterRegistration,
@@ -452,7 +453,7 @@ function handleWsIdentify(ws, data) {
     restoredLanguage: restoredLanguage ?? null,
   });
   if (replacedDuplicate) {
-    signalingLog.warn("ws.client.duplicate_replaced", {
+    signalingLog.info("ws.client.duplicate_replaced", {
       clientId: ws.id,
       restoredLanguage: restoredLanguage ?? null,
     });
@@ -492,6 +493,11 @@ function handleWsBroadcasterRegister(ws, data) {
         message: "Token inválido o sin permisos",
       })
     );
+    return true;
+  }
+
+  if (isDuplicateBroadcasterRegistration(broadcasters, data.language, ws)) {
+    touchClientActivity(ws);
     return true;
   }
 
@@ -731,13 +737,13 @@ wss.on("connection", (ws) => {
         closeCode: code,
         closeKind,
         closeReason: closeReasonText || null,
-        intentionalStop: code === 1000,
+        intentionalStop: code === 1000 || code === 4002,
         listeners,
       };
 
       if (code === 4001) {
         signalingLog.verbose("ws.client.disconnected", disconnectPayload);
-      } else if (code === 1000) {
+      } else if (code === 1000 || code === 4002) {
         signalingLog.info("ws.client.disconnected", disconnectPayload);
       } else {
         signalingLog.warn("ws.client.disconnected", disconnectPayload);

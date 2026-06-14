@@ -83,33 +83,6 @@ function Broadcaster({
     }
   }, [listenerCounts, selectedLanguage, prevCount]);
 
-  // Re-registrar automáticamente cuando el socket se reconecta
-  useEffect(() => {
-    if (
-      signalingServer &&
-      signalingServer.readyState === WebSocket.OPEN &&
-      broadcasting &&
-      selectedLanguage &&
-      token &&
-      !reconnecting
-    ) {
-      // Si estamos transmitiendo y el socket está abierto, asegurar que estamos registrados
-      try {
-        signalingServer.send(
-          JSON.stringify({
-            type: "broadcaster",
-            language: selectedLanguage,
-            token: token,
-            clientId: "broadcaster-" + selectedLanguage
-          })
-        );
-        console.log("🔄 Broadcaster re-registrado (socket reconectado)");
-      } catch (e) {
-        console.warn("⚠️ Error re-registrando broadcaster:", e);
-      }
-    }
-  }, [signalingServer, broadcasting, selectedLanguage, token, reconnecting]);
-
   // Manejar mensajes WebSocket
   useEffect(() => {
     if (!signalingServer) return; // No hacer nada si no hay socket

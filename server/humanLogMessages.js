@@ -1,5 +1,11 @@
 import { describeCloseCode } from "./wsCloseCodes.js";
 
+const MADRID_RECORDED_AT_FORMATTER = new Intl.DateTimeFormat("es-ES", {
+  timeZone: "Europe/Madrid",
+  dateStyle: "short",
+  timeStyle: "medium",
+});
+
 /**
  * @param {number | null | undefined} ms
  */
@@ -381,7 +387,9 @@ export function formatHumanLogDiagnosis(level, event, context = {}) {
   const isIntentionalDisconnect =
     context.intentionalStop === true ||
     context.closeKind === "normal_closure" ||
-    context.closeCode === 1000;
+    context.closeCode === 1000 ||
+    context.closeKind === "replaced_by_reconnect" ||
+    context.closeCode === 4002;
 
   /** @type {Set<string>} */
   const okInfoEvents = new Set([
@@ -392,6 +400,7 @@ export function formatHumanLogDiagnosis(level, event, context = {}) {
     "broadcaster.replaced_previous",
     "broadcaster.stopped",
     "listener.stopped",
+    "ws.client.duplicate_replaced",
     "ws.client.language_restored",
     "signaling.peer.pruned",
     "signaling.offer.requested",
@@ -476,7 +485,7 @@ export function formatHumanLogDiagnosis(level, event, context = {}) {
         ? "Código 1006 sin close frame: red móvil inestable o OS mató el proceso; el oyente no llama a identify tras reconectar y pierde idioma persistido; el emisor en Android sin foreground service deja de responder pong y luego cae."
         : context.role === "broadcaster"
           ? "Cierre 1001 going_away al cerrar pestaña pero activeBroadcasts no se actualiza si broadcasters[lang] !== ws; reconexión del emisor tarda y hay ventana sin broadcaster.registered."
-          : "Cierre 1000 no limpia sesión si shouldUpdateListenerCountOnClose devuelve false; código 4002 (replaced_by_reconnect) dispara warn innecesario si identifyClient no sincroniza language a tiempo."
+          : "Cierre 1000 no limpia sesión si shouldUpdateListenerCountOnClose devuelve false; identify tardío deja language null en el socket nuevo hasta register-listener."
     ),
     "ws.client.stale_closed": buildDiagnosisLines(
       "Por qué está mal: el cliente dejó de enviar actividad (ping/pong o mensajes) más tiempo del permitido; el servidor cerró el socket para liberar recursos.",
@@ -576,12 +585,28 @@ export function formatLogLevelLabel(level) {
 }
 
 /**
+ * Footer appended to every human log line so Render live-tail delay can be
+ * compared against the instant the server actually emitted the event.
+ *
+ * @param {string} isoTs
+ */
+export function formatServerRecordedAtFooter(isoTs) {
+  const date = new Date(isoTs);
+  if (Number.isNaN(date.getTime())) {
+    return `Registrado servidor: ${isoTs}`;
+  }
+  const madrid = MADRID_RECORDED_AT_FORMATTER.format(date);
+  return `Registrado servidor: ${madrid} (Madrid) · ${isoTs} (UTC)`;
+}
+
+/**
  * @param {import("./signalingLogger.js").LogLevel} level
  * @param {string} event
  * @param {Record<string, unknown>} [context]
+ * @param {string} [recordedAt] ISO timestamp shared with JSON payload `ts`
  */
-export function formatHumanLogLine(level, event, context = {}) {
-  const ts = new Date().toISOString();
+export function formatHumanLogLine(level, event, context = {}, recordedAt) {
+  const ts = recordedAt ?? new Date().toISOString();
   const emoji = eventEmoji(level, event);
   const headline = formatHumanLogHeadline(event, context);
   const { lines: diagnosis, isOk } = formatHumanLogDiagnosis(
@@ -593,6 +618,7 @@ export function formatHumanLogLine(level, event, context = {}) {
   if (isOk) {
     bodyLines.push("OK");
   }
+  bodyLines.push(formatServerRecordedAtFooter(ts));
   const body = bodyLines.map((line) => `  ${line}`).join("\n");
   return `${ts} [${formatLogLevelLabel(level)}] ${emoji} ${event}\n${body}`;
 }
