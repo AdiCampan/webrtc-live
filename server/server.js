@@ -35,6 +35,7 @@ import {
   findStandbyBroadcaster,
   parseStaleAfterMs,
 } from "./broadcasterStandby.js";
+import { isDuplicateBroadcasterRegistration } from "./broadcasterRegister.js";
 import {
   buildSignalingMetricsPayload,
   recordBroadcasterRegistration,
@@ -492,6 +493,11 @@ function handleWsBroadcasterRegister(ws, data) {
         message: "Token inválido o sin permisos",
       })
     );
+    return true;
+  }
+
+  if (isDuplicateBroadcasterRegistration(broadcasters, data.language, ws)) {
+    touchClientActivity(ws);
     return true;
   }
 

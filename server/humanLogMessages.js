@@ -576,12 +576,32 @@ export function formatLogLevelLabel(level) {
 }
 
 /**
+ * Footer appended to every human log line so Render live-tail delay can be
+ * compared against the instant the server actually emitted the event.
+ *
+ * @param {string} isoTs
+ */
+export function formatServerRecordedAtFooter(isoTs) {
+  const date = new Date(isoTs);
+  if (Number.isNaN(date.getTime())) {
+    return `Registrado servidor: ${isoTs}`;
+  }
+  const madrid = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(date);
+  return `Registrado servidor: ${madrid} (Madrid) · ${isoTs} (UTC)`;
+}
+
+/**
  * @param {import("./signalingLogger.js").LogLevel} level
  * @param {string} event
  * @param {Record<string, unknown>} [context]
+ * @param {string} [recordedAt] ISO timestamp shared with JSON payload `ts`
  */
-export function formatHumanLogLine(level, event, context = {}) {
-  const ts = new Date().toISOString();
+export function formatHumanLogLine(level, event, context = {}, recordedAt) {
+  const ts = recordedAt ?? new Date().toISOString();
   const emoji = eventEmoji(level, event);
   const headline = formatHumanLogHeadline(event, context);
   const { lines: diagnosis, isOk } = formatHumanLogDiagnosis(
@@ -593,6 +613,7 @@ export function formatHumanLogLine(level, event, context = {}) {
   if (isOk) {
     bodyLines.push("OK");
   }
+  bodyLines.push(formatServerRecordedAtFooter(ts));
   const body = bodyLines.map((line) => `  ${line}`).join("\n");
   return `${ts} [${formatLogLevelLabel(level)}] ${emoji} ${event}\n${body}`;
 }

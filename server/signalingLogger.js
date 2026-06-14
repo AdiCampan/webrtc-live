@@ -106,15 +106,16 @@ export function logSignalingEvent(
     return;
   }
 
+  const recordedAt = new Date().toISOString();
   const logFormat = resolveLogOutputFormat(process.env.SIGNALING_LOG_FORMAT);
   const payload = {
-    ts: new Date().toISOString(),
+    ts: recordedAt,
     level,
     event,
     ...context,
   };
   const jsonLine = JSON.stringify(payload);
-  const humanLine = formatHumanLogLine(level, event, context);
+  const humanLine = formatHumanLogLine(level, event, context, recordedAt);
 
   const emit = (writer) => {
     if (logFormat === "json") {
