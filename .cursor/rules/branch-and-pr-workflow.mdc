@@ -1,0 +1,49 @@
+---
+description: Git workflow with feature branches and pull requests for EbenEzer mirror repos
+alwaysApply: true
+---
+
+# Branch and pull request workflow
+
+These repositories use a mirror setup. Work only through feature branches and pull requests.
+
+## Repositories
+
+| Repo | Default branch | Origin (work here) | Upstream (auto-sync on merge) |
+|------|----------------|--------------------|------------------------------|
+| webrtc-live | `main` | Calatayud-Digital-Solutions/webrtc-live | AdiCampan/webrtc-live |
+| EbenEzerLive-MOBILE | `master` | Calatayud-Digital-Solutions/EbenEzerLive-MOBILE | AdiCampan/EbenEzerLive-MOBILE |
+| evidenta-biserica-firebase | `main` | Calatayud-Digital-Solutions/evidenta-biserica-firebase | AdiCampan/evidenta-biserica--firebase- |
+| church-organizer | `master` | Calatayud-Digital-Solutions/church-organizer | AdiCampan/church-organizer |
+
+## Mandatory workflow
+
+1. Never commit or push directly to the default branch (`main` or `master`) on `origin`.
+2. Before changes, update the default branch: `git fetch origin` and branch from `origin/<default>`.
+3. Create a descriptive branch: `feat/...`, `fix/...`, or `chore/...`.
+4. Commit on the feature branch and push to `origin`: `git push -u origin <branch>`.
+5. Open a PR to the default branch on `origin` (CodeRabbit reviews here).
+6. Do not push to `upstream` manually unless the user explicitly asks.
+7. After merge to the default branch, GitHub Actions syncs to AdiCampan automatically.
+
+## Pull request creation
+
+Use `gh pr create` against `origin`, targeting the repo default branch.
+
+Example for `webrtc-live`:
+
+```bash
+git checkout -b feat/my-change origin/main
+# ... changes ...
+git push -u origin feat/my-change
+gh pr create --base main --head feat/my-change --title "feat: my change" --body "## Summary\n- ..."
+```
+
+For repos with `master`, replace `main` with `master`.
+
+## Agent constraints
+
+- Do not run `git push origin main` or `git push origin master`.
+- Do not merge to the default branch locally; use the PR on GitHub.
+- Do not create commits on the user request unless they are on a feature branch.
+- If work started on the default branch, create a feature branch before committing.
