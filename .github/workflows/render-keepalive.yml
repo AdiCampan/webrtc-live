@@ -20,6 +20,7 @@ jobs:
           # Cold starts on Render free tier can exceed 60s; retry wakes the instance then succeeds.
           response="$(
             curl -fsS \
+              --http1.1 \
               --connect-timeout 30 \
               --max-time 120 \
               --retry 3 \
