@@ -5,6 +5,7 @@ import {
   clearListenerSession,
   handleRegisterListener,
   hasActiveBroadcaster,
+  normalizeListenerPlatform,
   persistListenerLanguage,
 } from "./registerListener.js";
 import { createClientSessionStore } from "./clientSessions.js";
@@ -16,7 +17,7 @@ test("handleRegisterListener sets language and schedules count update", () => {
 
   const handled = handleRegisterListener(
     ws,
-    { type: "register-listener", language: "es" },
+    { type: "register-listener", language: "es", platform: "android" },
     () => {
       scheduled += 1;
     },
@@ -25,7 +26,9 @@ test("handleRegisterListener sets language and schedules count update", () => {
 
   assert.equal(handled, true);
   assert.equal(ws.language, "es");
+  assert.equal(ws.platform, "android");
   assert.equal(store.getListenerLanguage("listener-1"), "es");
+  assert.equal(store.getListenerPlatform("listener-1"), "android");
   assert.equal(scheduled, 1);
 });
 
@@ -53,19 +56,31 @@ test("handleRegisterListener works without scheduleCountUpdate callback", () => 
     true
   );
   assert.equal(ws.language, "ro");
+  assert.equal(ws.platform, "unknown");
 });
 
 test("persistListenerLanguage and clearListenerSession update session store", () => {
   const store = createClientSessionStore();
   const ws = { id: "listener-4", language: null };
 
-  persistListenerLanguage(ws, "ro", store);
+  persistListenerLanguage(ws, "ro", store, "ios");
   assert.equal(ws.language, "ro");
+  assert.equal(ws.platform, "ios");
   assert.equal(store.getListenerLanguage("listener-4"), "ro");
+  assert.equal(store.getListenerPlatform("listener-4"), "ios");
 
   clearListenerSession(ws, store);
   assert.equal(ws.language, null);
+  assert.equal(ws.platform, "unknown");
   assert.equal(store.getListenerLanguage("listener-4"), null);
+});
+
+test("normalizeListenerPlatform accepts supported values only", () => {
+  assert.equal(normalizeListenerPlatform("web"), "web");
+  assert.equal(normalizeListenerPlatform("android"), "android");
+  assert.equal(normalizeListenerPlatform("ios"), "ios");
+  assert.equal(normalizeListenerPlatform("desktop"), "unknown");
+  assert.equal(normalizeListenerPlatform(null), "unknown");
 });
 
 test("hasActiveBroadcaster returns true when any language is live", () => {

@@ -4,7 +4,7 @@
  */
 
 /**
- * @typedef {{ language: string; lastSeenAt: number }} ListenerSession
+ * @typedef {{ language: string; platform: string; lastSeenAt: number }} ListenerSession
  */
 
 export function createClientSessionStore() {
@@ -12,8 +12,8 @@ export function createClientSessionStore() {
   const listeners = new Map();
 
   return {
-    setListenerLanguage(clientId, language) {
-      listeners.set(clientId, { language, lastSeenAt: Date.now() });
+    setListenerLanguage(clientId, language, platform = "unknown") {
+      listeners.set(clientId, { language, platform, lastSeenAt: Date.now() });
     },
 
     touchListener(clientId) {
@@ -30,6 +30,14 @@ export function createClientSessionStore() {
 
     getListenerLanguage(clientId) {
       return listeners.get(clientId)?.language ?? null;
+    },
+
+    getListenerPlatform(clientId) {
+      return listeners.get(clientId)?.platform ?? null;
+    },
+
+    getListenerSession(clientId) {
+      return listeners.get(clientId) ?? null;
     },
 
     /**

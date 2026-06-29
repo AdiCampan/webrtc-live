@@ -34,6 +34,7 @@ const rtcConfig = {
 };
 
 const LISTENER_REGISTRATION_MS = 25 * 1000;
+const LISTENER_PLATFORM = "web";
 
 function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
   const pcRef = useRef(null);
@@ -63,7 +64,8 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
     signalingServer.send(JSON.stringify({ 
       type: "request-offer", 
       language, 
-      clientId 
+      clientId,
+      platform: LISTENER_PLATFORM,
     }));
     console.log("📡 Listener solicitó oferta para idioma", language, "con ID", clientId);
     setStatus("requesting");
@@ -74,7 +76,12 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
       return;
     }
     signalingServer.send(
-      JSON.stringify({ type: "register-listener", language, clientId })
+      JSON.stringify({
+        type: "register-listener",
+        language,
+        clientId,
+        platform: LISTENER_PLATFORM,
+      })
     );
     console.log("📋 Listener re-registrado para idioma", language);
   };
@@ -366,7 +373,13 @@ function Listener({ signalingServer, language, setRole, onBackgroundTick }) {
     const maybeRequest = () => {
       // 1. Identificarse ante el servidor con ID persistente
       if (signalingServer.readyState === WebSocket.OPEN) {
-        signalingServer.send(JSON.stringify({ type: "identify", clientId }));
+        signalingServer.send(
+          JSON.stringify({
+            type: "identify",
+            clientId,
+            platform: LISTENER_PLATFORM,
+          })
+        );
         console.log("🆔 Enviada identificación persistente:", clientId);
       }
 

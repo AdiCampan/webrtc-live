@@ -50,6 +50,7 @@ export function buildClientLogContext(ws) {
     clientId: ws.id ?? null,
     role: ws.isBroadcaster ? "broadcaster" : ws.language ? "listener" : "idle",
     language: ws.language ?? null,
+    platform: ws.platform ?? null,
     ...(connectedAt
       ? { connectedDurationMs: now - connectedAt }
       : {}),

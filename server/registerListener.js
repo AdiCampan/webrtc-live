@@ -14,9 +14,10 @@ export function handleRegisterListener(
   }
 
   ws.language = data.language;
+  ws.platform = normalizeListenerPlatform(data.platform ?? ws.platform);
 
   if (sessionStore && ws.id) {
-    sessionStore.setListenerLanguage(ws.id, data.language);
+    sessionStore.setListenerLanguage(ws.id, data.language, ws.platform);
   }
 
   if (typeof scheduleCountUpdate === "function") {
@@ -26,15 +27,21 @@ export function handleRegisterListener(
   return true;
 }
 
-export function persistListenerLanguage(ws, language, sessionStore) {
+export function normalizeListenerPlatform(platform) {
+  return ["web", "android", "ios"].includes(platform) ? platform : "unknown";
+}
+
+export function persistListenerLanguage(ws, language, sessionStore, platform) {
   ws.language = language;
+  ws.platform = normalizeListenerPlatform(platform ?? ws.platform);
   if (sessionStore && ws.id) {
-    sessionStore.setListenerLanguage(ws.id, language);
+    sessionStore.setListenerLanguage(ws.id, language, ws.platform);
   }
 }
 
 export function clearListenerSession(ws, sessionStore) {
   ws.language = null;
+  ws.platform = "unknown";
   if (sessionStore && ws.id) {
     sessionStore.clearListenerLanguage(ws.id);
   }
