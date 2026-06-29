@@ -37,7 +37,8 @@ export function createClientSessionStore() {
     },
 
     getListenerSession(clientId) {
-      return listeners.get(clientId) ?? null;
+      const session = listeners.get(clientId);
+      return session ? { ...session } : null;
     },
 
     /**

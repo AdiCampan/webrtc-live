@@ -34,6 +34,20 @@ test("createClientSessionStore touch and purge expired sessions", () => {
   assert.equal(store.getListenerLanguage("client-b"), null);
 });
 
+test("getListenerSession returns a copy of the stored session", () => {
+  const store = createClientSessionStore();
+  store.setListenerLanguage("client-copy", "es", "android");
+
+  const session = store.getListenerSession("client-copy");
+  session.language = "ro";
+  session.platform = "ios";
+  session.lastSeenAt = 0;
+
+  assert.equal(store.getListenerLanguage("client-copy"), "es");
+  assert.equal(store.getListenerPlatform("client-copy"), "android");
+  assert.notEqual(store.getListenerSession("client-copy")?.lastSeenAt, 0);
+});
+
 test("applyClientIdentify closes duplicate socket and restores language", () => {
   const store = createClientSessionStore();
   store.setListenerLanguage("listener-1", "es", "ios");

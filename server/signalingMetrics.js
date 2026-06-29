@@ -109,6 +109,7 @@ export function countListenersByPlatform(clients, sessionStore, graceMs = 0) {
   for (const client of clients) {
     if (client.readyState !== WS_OPEN) continue;
     if (client.isBroadcaster || !client.language) continue;
+    if (client.id && countedIds.has(client.id)) continue;
 
     const platform = normalizePlatform(client.platform);
     counts[platform] += 1;

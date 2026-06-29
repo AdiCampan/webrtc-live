@@ -28,7 +28,10 @@ export function handleRegisterListener(
 }
 
 export function normalizeListenerPlatform(platform) {
-  return ["web", "android", "ios"].includes(platform) ? platform : "unknown";
+  const normalized = typeof platform === "string" ? platform.toLowerCase() : "";
+  return ["web", "android", "ios"].includes(normalized)
+    ? normalized
+    : "unknown";
 }
 
 export function persistListenerLanguage(ws, language, sessionStore, platform) {

@@ -95,6 +95,32 @@ test("countListenersByPlatform includes open clients and grace sessions", () => 
   });
 });
 
+test("countListenersByPlatform counts duplicate open listener ids once", () => {
+  const clients = [
+    {
+      id: "same-listener",
+      readyState: OPEN,
+      isBroadcaster: false,
+      language: "es",
+      platform: "web",
+    },
+    {
+      id: "same-listener",
+      readyState: OPEN,
+      isBroadcaster: false,
+      language: "es",
+      platform: "android",
+    },
+  ];
+
+  assert.deepStrictEqual(countListenersByPlatform(clients, null, 0), {
+    web: 1,
+    android: 0,
+    ios: 0,
+    unknown: 0,
+  });
+});
+
 test("buildSignalingMetricsPayload includes last error and last broadcaster registration", () => {
   recordSignalingError("unit-test failure");
   recordBroadcasterRegistration("es", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");

@@ -79,6 +79,8 @@ test("normalizeListenerPlatform accepts supported values only", () => {
   assert.equal(normalizeListenerPlatform("web"), "web");
   assert.equal(normalizeListenerPlatform("android"), "android");
   assert.equal(normalizeListenerPlatform("ios"), "ios");
+  assert.equal(normalizeListenerPlatform("Android"), "android");
+  assert.equal(normalizeListenerPlatform("iOS"), "ios");
   assert.equal(normalizeListenerPlatform("desktop"), "unknown");
   assert.equal(normalizeListenerPlatform(null), "unknown");
 });
