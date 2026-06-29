@@ -101,7 +101,7 @@ El servidor solo **reenvía señalización WebRTC** (SDP / ICE); el audio va ent
 - **Debouncing del mensaje `listeners-count`** para que reconectar muchos oyentes no dispare un broadcast global por usuario en cascada (menos tráfico WS cuando hay pico).
 - **Logging legible en Render** (frases en español, una línea por evento) con slug técnico al final para filtrar; opcionalmente JSON con `SIGNALING_LOG_FORMAT=json`.
 - **`GET /health`**, antes del SPA (`index.html`), devuelve JSON (`ok`, `uptimeSeconds`, `websocketClients`) para vigilar uptime desde cron u otros sistemas.
-- **`GET /signaling/metrics`**: snapshot operativo (oyentes por idioma, broadcasters activos, último error registrado).
+- **`GET /signaling/metrics`**: snapshot operativo (oyentes por idioma y plataforma, broadcasters activos, último error registrado).
 
 **Variables útiles en Render**
 

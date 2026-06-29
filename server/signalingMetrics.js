@@ -1,6 +1,12 @@
 const WS_OPEN = 1;
 
 const SUPPORTED_LANGS = /** @type {const} */ (["es", "en", "ro"]);
+const SUPPORTED_PLATFORMS = /** @type {const} */ ([
+  "web",
+  "android",
+  "ios",
+  "unknown",
+]);
 
 /** @type {{ atMs: number; message: string } | null} */
 let lastError = null;
@@ -82,6 +88,51 @@ export function countClientsByRole(clients, openState = WS_OPEN) {
 }
 
 /**
+ * @param {string | null | undefined} platform
+ */
+function normalizePlatform(platform) {
+  return SUPPORTED_PLATFORMS.includes(platform) ? platform : "unknown";
+}
+
+/**
+ * @param {Iterable<ClientLike & { id?: string; platform?: string | null }>} clients
+ * @param {{ forEachActiveListenerSession?: (fn: (clientId: string, session: { platform?: string; lastSeenAt: number }) => void) => void } | null | undefined} sessionStore
+ * @param {number} graceMs
+ */
+export function countListenersByPlatform(clients, sessionStore, graceMs = 0) {
+  /** @type {Record<string, number>} */
+  const counts = { web: 0, android: 0, ios: 0, unknown: 0 };
+  /** @type {Set<string>} */
+  const countedIds = new Set();
+  const now = Date.now();
+
+  for (const client of clients) {
+    if (client.readyState !== WS_OPEN) continue;
+    if (client.isBroadcaster || !client.language) continue;
+    if (client.id && countedIds.has(client.id)) continue;
+
+    const platform = normalizePlatform(client.platform);
+    counts[platform] += 1;
+    if (client.id) {
+      countedIds.add(client.id);
+    }
+  }
+
+  if (graceMs > 0 && sessionStore?.forEachActiveListenerSession) {
+    sessionStore.forEachActiveListenerSession((clientId, session) => {
+      if (countedIds.has(clientId)) return;
+      if (now - session.lastSeenAt > graceMs) return;
+
+      const platform = normalizePlatform(session.platform);
+      counts[platform] += 1;
+      countedIds.add(clientId);
+    });
+  }
+
+  return counts;
+}
+
+/**
  * @param {Record<string, { id: string; readyState: number; broadcasterRegisteredAt?: number } | null | undefined>} broadcastersMap
  */
 function activeBroadcastersSnapshot(broadcastersMap) {
@@ -127,6 +178,8 @@ function lastRegistrationSnapshot(registrations) {
  * @param {Record<string, { id: string; readyState: number; broadcasterRegisteredAt?: number } | null | undefined>} input.broadcasters
  * @param {number} input.uptimeSeconds
  * @param {number} input.totalConnections
+ * @param {{ forEachActiveListenerSession?: (fn: (clientId: string, session: { platform?: string; lastSeenAt: number }) => void) => void }} [input.sessionStore]
+ * @param {number} [input.listenerBackgroundGraceMs]
  */
 export function buildSignalingMetricsPayload(input) {
   const byRole = countClientsByRole(input.clients);
@@ -140,6 +193,11 @@ export function buildSignalingMetricsPayload(input) {
       listener: byRole.listener,
     },
     listenersByLanguage: byRole.listenersByLanguage,
+    listenersByPlatform: countListenersByPlatform(
+      input.clients,
+      input.sessionStore,
+      input.listenerBackgroundGraceMs ?? 0
+    ),
     activeBroadcasters: activeBroadcastersSnapshot(input.broadcasters),
     lastBroadcasterRegistration: lastRegistrationSnapshot(
       lastBroadcasterRegistration

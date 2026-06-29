@@ -5,7 +5,7 @@ const WS_OPEN = 1;
  * @param {object} params.ws
  * @param {string} params.clientId
  * @param {Iterable<object>} params.clients
- * @param {{ getListenerLanguage: (id: string) => string | null }} params.sessionStore
+ * @param {{ getListenerSession?: (id: string) => { language: string; platform: string } | null; getListenerLanguage: (id: string) => string | null }} params.sessionStore
  * @param {(reason: string) => void} [params.onDuplicateClosed]
  * @returns {{ replacedDuplicate: boolean, restoredLanguage: string | null }}
  */
@@ -35,9 +35,18 @@ export function applyClientIdentify({
 
   ws.id = clientId;
 
-  const restoredLanguage = sessionStore.getListenerLanguage(clientId);
+  const restoredSession =
+    typeof sessionStore.getListenerSession === "function"
+      ? sessionStore.getListenerSession(clientId)
+      : null;
+  const restoredLanguage =
+    restoredSession?.language ?? sessionStore.getListenerLanguage(clientId);
   if (restoredLanguage && !ws.isBroadcaster) {
     ws.language = restoredLanguage;
+    ws.platform =
+      ws.platform && ws.platform !== "unknown"
+        ? ws.platform
+        : restoredSession?.platform ?? "unknown";
   }
 
   return { replacedDuplicate, restoredLanguage };

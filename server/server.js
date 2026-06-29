@@ -29,6 +29,7 @@ import {
   clearListenerSession,
   handleRegisterListener,
   hasActiveBroadcaster,
+  normalizeListenerPlatform,
   persistListenerLanguage,
 } from "./registerListener.js";
 import {
@@ -256,6 +257,8 @@ app.get("/signaling/metrics", (_req, res) => {
     buildSignalingMetricsPayload({
       clients: wss.clients,
       broadcasters,
+      sessionStore: clientSessions,
+      listenerBackgroundGraceMs: LISTENER_BACKGROUND_GRACE_MS,
       uptimeSeconds: Math.floor(process.uptime()),
       totalConnections: wss.clients.size,
     })
@@ -436,6 +439,7 @@ registerGracefulShutdown({
 
 function handleWsIdentify(ws, data) {
   if (data.type !== "identify" || !data.clientId) return false;
+  ws.platform = normalizeListenerPlatform(data.platform ?? ws.platform);
 
   const { replacedDuplicate, restoredLanguage } = applyClientIdentify({
     ws,
@@ -449,12 +453,14 @@ function handleWsIdentify(ws, data) {
 
   signalingLog.verbose("ws.client.identified", {
     clientId: ws.id,
+    platform: ws.platform ?? "unknown",
     replacedDuplicate,
     restoredLanguage: restoredLanguage ?? null,
   });
   if (replacedDuplicate) {
     signalingLog.info("ws.client.duplicate_replaced", {
       clientId: ws.id,
+      platform: ws.platform ?? "unknown",
       restoredLanguage: restoredLanguage ?? null,
     });
   }
@@ -463,6 +469,7 @@ function handleWsIdentify(ws, data) {
     signalingLog.info("ws.client.language_restored", {
       clientId: ws.id,
       language: restoredLanguage,
+      platform: ws.platform ?? "unknown",
     });
     listenerCountNotifier.schedule();
   }
@@ -562,7 +569,7 @@ function handleWsRegisterListener(ws, data) {
 
 function handleWsRequestOffer(ws, data) {
   if (data.type !== "request-offer" || !data.language) return false;
-  persistListenerLanguage(ws, data.language, clientSessions);
+  persistListenerLanguage(ws, data.language, clientSessions, data.platform);
   listenerCountNotifier.schedule();
 
   const targetBroadcaster = broadcasters[data.language];
@@ -577,12 +584,14 @@ function handleWsRequestOffer(ws, data) {
     signalingLog.verbose("signaling.offer.requested", {
       language: data.language,
       listenerId: ws.id,
+      platform: ws.platform ?? "unknown",
       broadcasterId: targetBroadcaster.id,
     });
   } else {
     signalingLog.warn("signaling.offer.no_broadcaster", {
       language: data.language,
       listenerId: ws.id,
+      platform: ws.platform ?? "unknown",
       activeBroadcasts: { ...activeBroadcasts },
     });
   }
@@ -672,6 +681,7 @@ wss.on("connection", (ws) => {
   ws.id = uuidv4();
   ws.isBroadcaster = false;
   ws.language = null;
+  ws.platform = "unknown";
   ws.connectedAt = Date.now();
   touchClientActivity(ws);
   ws.on("pong", () => {
