@@ -8,6 +8,7 @@ on:
 
 jobs:
   ping-health:
+    if: github.event_name == 'workflow_dispatch' || github.repository == 'Calatayud-Digital-Solutions/webrtc-live'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
