@@ -406,12 +406,12 @@ function broadcastToAll(message) {
 // 🔹 Función para actualizar conteo de oyentes por idioma
 function updateListenerCounts() {
   clientSessions.purgeExpiredSessions(LISTENER_BACKGROUND_GRACE_MS);
-  const counts = buildListenerCountPayload(
+  const countPayload = buildListenerCountPayload(
     wss.clients,
     clientSessions,
     LISTENER_BACKGROUND_GRACE_MS
   );
-  broadcastToAll({ type: "listeners-count", listeners: counts });
+  broadcastToAll({ type: "listeners-count", ...countPayload });
 }
 
 const listenerCountNotifier = createDebouncedCallback(

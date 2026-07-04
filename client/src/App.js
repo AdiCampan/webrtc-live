@@ -18,7 +18,7 @@ import {
   Youtube,
   MessageCircle,
 } from "lucide-react";
-import { FaWhatsapp, FaApple, FaAndroid } from "react-icons/fa";
+import { FaApple, FaAndroid } from "react-icons/fa";
 import {
   buildBroadcasterReregisterPayload,
   isServerShutdownMessage,
@@ -47,6 +47,12 @@ function App() {
     en: 0,
     ro: 0,
   });
+  const [listenerPlatformCounts, setListenerPlatformCounts] = useState({
+    web: 0,
+    android: 0,
+    ios: 0,
+    unknown: 0,
+  });
   // Usuario logueado y rol
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
@@ -62,6 +68,12 @@ function App() {
   const [pop, setPop] = useState(false);
 
   const currentCount = listenerCounts[activeLanguage] || 0;
+  const totalPlatformListeners =
+    listenerPlatformCounts.web +
+    listenerPlatformCounts.android +
+    listenerPlatformCounts.ios +
+    listenerPlatformCounts.unknown;
+  const shouldShowPlatformCounts = totalPlatformListeners > 0;
 
   useEffect(() => {
     if (currentCount !== prevCount) {
@@ -278,7 +290,16 @@ function App() {
             en: data.listeners.en || 0,
             ro: data.listeners.ro || 0,
           });
-          console.log("👂 Oyentes activos:", data.listeners);
+          setListenerPlatformCounts({
+            web: data.listenersByPlatform?.web || 0,
+            android: data.listenersByPlatform?.android || 0,
+            ios: data.listenersByPlatform?.ios || 0,
+            unknown: data.listenersByPlatform?.unknown || 0,
+          });
+          console.log("👂 Oyentes activos:", {
+            byLanguage: data.listeners,
+            byPlatform: data.listenersByPlatform,
+          });
         }
       } catch (e) {
         console.error("⚠️ Error procesando mensaje WS:", e);
@@ -353,12 +374,6 @@ function App() {
 
         createWebSocket(signalingUrl);
       }
-    }
-    
-    // 3. Verificación de salud del WebSocket (si parece abierto pero no responde)
-    const now = Date.now();
-    if (s && s.readyState === WebSocket.OPEN && lastReconnectAttemptRef.current > 0) {
-       // Si acabamos de reconectar hace poco, no hacemos nada más
     }
   };
 
@@ -481,7 +496,7 @@ function App() {
                     {isActive && (
                       <div className="onair-badge">
                         ONAIR
-                        <span className="listener-count">
+                        <span className={`listener-count ${pop ? "pop" : ""}`}>
                           {/* {currentCount > 0 ? `👂 ${currentCount}` : ""} */}
                           {count > 0 ? `👂 ${count}` : ""}
                         </span>
@@ -500,6 +515,26 @@ function App() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {shouldShowPlatformCounts && (
+            <div className="platform-counts-card" aria-live="polite">
+              <span className="platform-counts-title">Oyentes por origen</span>
+              <div className="platform-counts-grid">
+                <span className="platform-count">
+                  <Globe size={16} />
+                  Web: {listenerPlatformCounts.web}
+                </span>
+                <span className="platform-count">
+                  <FaAndroid size={16} />
+                  Android: {listenerPlatformCounts.android}
+                </span>
+                <span className="platform-count">
+                  <FaApple size={16} />
+                  iPhone: {listenerPlatformCounts.ios}
+                </span>
+              </div>
             </div>
           )}
 
