@@ -31,7 +31,7 @@ test("formatListenerSummary renders totals and languages", () => {
       byLanguage: { es: 6, en: 0, ro: 0 },
       byPlatform: { web: 2, android: 3, ios: 1, unknown: 0 },
     }),
-    "6 oyentes (es: 6 · origen: web: 2, Android: 3, iPhone: 1)"
+    "6 oyentes (es: 6 · origen: Web: 2, Android: 3, iPhone: 1)"
   );
   assert.equal(
     formatListenerSummary({ totalListeners: 1, byLanguage: { es: 1, en: 0, ro: 0 } }),

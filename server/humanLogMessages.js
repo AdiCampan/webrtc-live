@@ -47,7 +47,7 @@ export function formatListenerSummary(listeners) {
     .map(([lang, count]) => `${lang}: ${count}`)
     .join(", ");
   const platformLabels = {
-    web: "web",
+    web: "Web",
     android: "Android",
     ios: "iPhone",
     unknown: "desconocido",

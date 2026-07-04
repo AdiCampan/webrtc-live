@@ -74,6 +74,30 @@ test("computeListenerCounts deduplicates open sockets by listener id", () => {
   });
 });
 
+test("computeListenerCounts ignores unsupported listener languages", () => {
+  const store = createClientSessionStore();
+  store.setListenerLanguage("listener-session-unsupported", "fr", "android");
+  const clients = [
+    {
+      id: "listener-unsupported",
+      readyState: 1,
+      isBroadcaster: false,
+      language: "fr",
+      platform: "web",
+    },
+  ];
+
+  const counts = computeListenerCounts(clients, store, 1_800_000);
+  assert.equal(counts.totalListeners, 0);
+  assert.deepEqual(counts.byLanguage, { es: 0, en: 0, ro: 0 });
+  assert.deepEqual(counts.byPlatform, {
+    web: 0,
+    android: 0,
+    ios: 0,
+    unknown: 0,
+  });
+});
+
 test("buildListenerCountPayload matches broadcast shape", () => {
   const store = createClientSessionStore();
   const payload = buildListenerCountPayload([], store, 1_800_000);

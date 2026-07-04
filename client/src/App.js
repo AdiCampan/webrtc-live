@@ -73,8 +73,7 @@ function App() {
     listenerPlatformCounts.android +
     listenerPlatformCounts.ios +
     listenerPlatformCounts.unknown;
-  const shouldShowPlatformCounts =
-    totalPlatformListeners > 0 || Object.values(activeLanguages).some(Boolean);
+  const shouldShowPlatformCounts = totalPlatformListeners > 0;
 
   useEffect(() => {
     if (currentCount !== prevCount) {

@@ -1,6 +1,7 @@
 const WS_OPEN = 1;
 const LISTENER_BACKGROUND_GRACE_MIN_MS = 60_000;
 const LISTENER_BACKGROUND_GRACE_MAX_MS = 10_800_000;
+const SUPPORTED_LANGUAGES = ["es", "en", "ro"];
 const SUPPORTED_PLATFORMS = ["web", "android", "ios", "unknown"];
 
 /**
@@ -29,6 +30,13 @@ function normalizePlatform(platform) {
 }
 
 /**
+ * @param {string | null | undefined} language
+ */
+function isSupportedLanguage(language) {
+  return SUPPORTED_LANGUAGES.includes(language);
+}
+
+/**
  * Counts listeners on open WebSockets plus sessions still within the background
  * grace window (same clientId, no duplicate WS). Keeps dashboard counts accurate
  * when Android suspends the signaling socket but WebRTC audio continues.
@@ -50,7 +58,11 @@ export function computeListenerCounts(clients, sessionStore, graceMs) {
     if (client.readyState !== WS_OPEN) {
       continue;
     }
-    if (client.isBroadcaster || !client.language || !client.id) {
+    if (
+      client.isBroadcaster ||
+      !client.id ||
+      !isSupportedLanguage(client.language)
+    ) {
       continue;
     }
     if (countedIds.has(client.id)) {
