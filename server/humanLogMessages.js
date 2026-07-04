@@ -33,7 +33,7 @@ export function shortenClientId(clientId) {
 }
 
 /**
- * @param {{ totalListeners?: number; byLanguage?: Record<string, number> } | null | undefined} listeners
+ * @param {{ totalListeners?: number; byLanguage?: Record<string, number>; byPlatform?: Record<string, number> } | null | undefined} listeners
  */
 export function formatListenerSummary(listeners) {
   if (!listeners || listeners.totalListeners == null) {
@@ -46,8 +46,21 @@ export function formatListenerSummary(listeners) {
     .filter(([, count]) => count > 0)
     .map(([lang, count]) => `${lang}: ${count}`)
     .join(", ");
-  const breakdown = activeLangs ? ` (${activeLangs})` : "";
-  return `${total} ${label}${breakdown}`;
+  const platformLabels = {
+    web: "web",
+    android: "Android",
+    ios: "iPhone",
+    unknown: "desconocido",
+  };
+  const byPlatform = listeners.byPlatform ?? {};
+  const activePlatforms = Object.entries(byPlatform)
+    .filter(([, count]) => count > 0)
+    .map(([platform, count]) => `${platformLabels[platform] ?? platform}: ${count}`)
+    .join(", ");
+  const breakdown = [activeLangs, activePlatforms ? `origen: ${activePlatforms}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  return `${total} ${label}${breakdown ? ` (${breakdown})` : ""}`;
 }
 
 /**
@@ -137,7 +150,7 @@ export function formatHumanLogHeadline(event, context = {}) {
     typeof context.broadcasterId === "string" ? context.broadcasterId : null
   );
   const listeners = formatListenerSummary(
-    /** @type {{ totalListeners?: number; byLanguage?: Record<string, number> } | undefined} */ (
+    /** @type {{ totalListeners?: number; byLanguage?: Record<string, number>; byPlatform?: Record<string, number> } | undefined} */ (
       context.listeners
     )
   );
