@@ -10,7 +10,7 @@ jobs:
   ping-health:
     if: github.event_name == 'workflow_dispatch' || github.repository == 'Calatayud-Digital-Solutions/webrtc-live'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Wake signaling server
         env:
@@ -34,7 +34,7 @@ jobs:
             )"; then
               echo "Response: ${response}"
 
-              if [[ "${response}" == *'"ok":true'* ]]; then
+              if jq -e '.ok == true' >/dev/null <<<"${response}"; then
                 exit 0
               fi
 
