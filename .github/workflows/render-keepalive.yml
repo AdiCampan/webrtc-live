@@ -10,24 +10,43 @@ jobs:
   ping-health:
     if: github.event_name == 'workflow_dispatch' || github.repository == 'Calatayud-Digital-Solutions/webrtc-live'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Wake signaling server
         env:
           SIGNALING_HEALTH_URL: https://webrtc-live-ct59.onrender.com/health
+          HEALTH_ATTEMPTS: "15"
+          HEALTH_TIMEOUT_SECONDS: "20"
+          HEALTH_RETRY_DELAY_SECONDS: "10"
         run: |
           set -euo pipefail
           echo "Pinging ${SIGNALING_HEALTH_URL}"
-          # Cold starts on Render free tier can exceed 60s; retry wakes the instance then succeeds.
-          response="$(
-            curl -fsS \
-              --http1.1 \
-              --connect-timeout 30 \
-              --max-time 120 \
-              --retry 3 \
-              --retry-delay 20 \
-              --retry-all-errors \
-              "${SIGNALING_HEALTH_URL}"
-          )"
-          echo "Response: ${response}"
-          echo "${response}" | grep -q '"ok":true'
+          last_error=""
+
+          for attempt in $(seq 1 "${HEALTH_ATTEMPTS}"); do
+            echo "Attempt ${attempt}/${HEALTH_ATTEMPTS}"
+
+            if response="$(
+              curl -fsS \
+                --connect-timeout 10 \
+                --max-time "${HEALTH_TIMEOUT_SECONDS}" \
+                "${SIGNALING_HEALTH_URL}"
+            )"; then
+              echo "Response: ${response}"
+
+              if jq -e '.ok == true' >/dev/null <<<"${response}"; then
+                exit 0
+              fi
+
+              last_error="Unexpected health response: ${response}"
+            else
+              exit_code=$?
+              last_error="curl failed with exit code ${exit_code}"
+              echo "${last_error}"
+            fi
+
+            sleep "${HEALTH_RETRY_DELAY_SECONDS}"
+          done
+
+          echo "Health check did not succeed. ${last_error}" >&2
+          exit 1
