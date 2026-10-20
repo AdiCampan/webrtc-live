@@ -1,9 +1,8 @@
+# Periodic health pings are performed by an external monitor.
+# This workflow remains for manual runs only.
 name: Render keep-alive
 
 on:
-  schedule:
-    # Every 10 minutes — Render free tier sleeps after ~15 min idle; GitHub cron can drift.
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
