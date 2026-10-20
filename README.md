@@ -269,9 +269,9 @@ Para ver logs del móvil en pruebas: Xcode Console (iOS) o `adb logcat` filtrand
 
 ---
 
-**Keep-alive automático (plan gratis)**
+**Keep-alive (plan gratis)**
 
-El workflow `.github/workflows/render-keepalive.yml` hace ping a `/health` cada **10 minutos** (con reintentos y timeout ampliado para cold starts de Render) para evitar que duerma el servicio entre cultos. Actívalo haciendo push a la rama principal del repo en GitHub.
+UptimeRobot hace los pings periódicos a `/health` para que el servicio de Render no se duerma entre cultos. El workflow `.github/workflows/render-keepalive.yml` solo se ejecuta a mano con `workflow_dispatch` y conserva los reintentos y el timeout ampliado para los cold starts de Render.
 
 **Reinicios de Render**
 
